@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+.venv/
+.env
+data/*
+!data/.gitkeep
+!data/README.md
+dist/
+*.sqlite3
