@@ -7,3 +7,6 @@ data/*
 !data/README.md
 dist/
 *.sqlite3
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
