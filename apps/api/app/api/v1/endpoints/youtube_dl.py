@@ -1,10 +1,16 @@
 import logging
+import hashlib
+import json
 import mimetypes
 import os
 import shutil
+import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
@@ -35,7 +41,115 @@ class DownloadBody(BaseModel):
 class YoutubeDownloaderSettings(BaseModel):
     output_directory: str = Field(min_length=1, max_length=1024)
     output_format: Literal["mp4", "webm", "mov", "mp3", "wav"] = "mp4"
-    quality: Literal["best", "2160", "1440", "1080", "720", "480"] = "best"
+    quality: Literal["best", "320", "256", "192", "128", "2160", "1440", "1080", "720", "480"] = "best"
+
+
+def _hide_windows_directory(path: Path) -> None:
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        attributes = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+        if attributes != -1:
+            ctypes.windll.kernel32.SetFileAttributesW(str(path), attributes | 0x02)
+    except (AttributeError, OSError):
+        log.debug("No se pudo marcar como oculta la carpeta local de FFmpeg.", exc_info=True)
+
+
+def _ensure_audio_ffmpeg(data_dir: Path) -> str | None:
+    """Find FFmpeg or download a private local copy on demand for audio conversion."""
+    try:
+        subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True, timeout=10)
+        return None  # Let yt-dlp resolve the system executable through PATH.
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    target_dir = data_dir / ".tools" / "ffmpeg"
+    executable = target_dir / ("ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    _hide_windows_directory(target_dir.parent)
+    _hide_windows_directory(target_dir)
+
+    if executable.is_file():
+        try:
+            subprocess.run([str(executable), "-version"], check=True, capture_output=True, timeout=10)
+            return str(executable)
+        except (OSError, subprocess.SubprocessError):
+            executable.unlink(missing_ok=True)
+
+    if os.name != "nt":
+        # imageio-ffmpeg supplies a platform-specific executable for non-Windows installs.
+        bundled = Path(imageio_ffmpeg.get_ffmpeg_exe())
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(bundled, executable)
+        executable.chmod(executable.stat().st_mode | 0o111)
+    else:
+        archive_path = target_dir / "ffmpeg-download.zip"
+        temporary_executable = target_dir / "ffmpeg-download.exe"
+        release_api = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest"
+        try:
+            request = urllib.request.Request(
+                release_api,
+                headers={"Accept": "application/vnd.github+json", "User-Agent": "Hub YouTube Downloader"},
+            )
+            with urllib.request.urlopen(request, timeout=30) as response:
+                release = json.load(response)
+            asset = next(
+                item for item in release.get("assets", [])
+                if item.get("name", "").endswith("-essentials_build.zip")
+            )
+            download_url = asset["browser_download_url"]
+            expected_checksum = asset.get("digest", "")
+            if not expected_checksum.startswith("sha256:"):
+                raise RuntimeError("GitHub no publicó un SHA-256 válido para el ZIP de FFmpeg.")
+            expected_checksum = expected_checksum.removeprefix("sha256:").lower()
+            if asset.get("size", 0) > 300 * 1024 * 1024:
+                raise RuntimeError("El archivo de FFmpeg supera el tamaño permitido.")
+
+            request = urllib.request.Request(download_url, headers={"User-Agent": "Hub YouTube Downloader"})
+            with urllib.request.urlopen(request, timeout=60) as response, archive_path.open("wb") as archive_file:
+                content_length = response.headers.get("Content-Length")
+                if content_length and int(content_length) > 300 * 1024 * 1024:
+                    raise RuntimeError("El archivo de FFmpeg supera el tamaño permitido.")
+                downloaded_bytes = 0
+                while chunk := response.read(1024 * 1024):
+                    downloaded_bytes += len(chunk)
+                    if downloaded_bytes > 300 * 1024 * 1024:
+                        raise RuntimeError("El archivo de FFmpeg supera el tamaño permitido.")
+                    archive_file.write(chunk)
+
+            digest = hashlib.sha256()
+            with archive_path.open("rb") as archive_file:
+                while chunk := archive_file.read(1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest() != expected_checksum:
+                raise RuntimeError("La verificación SHA-256 del ZIP de FFmpeg falló.")
+
+            with zipfile.ZipFile(archive_path) as archive:
+                ffmpeg_member = next(
+                    (name for name in archive.namelist() if name.lower().endswith("/bin/ffmpeg.exe")),
+                    None,
+                )
+                if ffmpeg_member is None:
+                    raise RuntimeError("El ZIP descargado no contiene ffmpeg.exe.")
+                with archive.open(ffmpeg_member) as source, temporary_executable.open("wb") as destination:
+                    while chunk := source.read(1024 * 1024):
+                        destination.write(chunk)
+
+            subprocess.run([str(temporary_executable), "-version"], check=True, capture_output=True, timeout=20)
+            temporary_executable.replace(executable)
+        except (OSError, urllib.error.URLError, zipfile.BadZipFile, subprocess.SubprocessError, json.JSONDecodeError, StopIteration, KeyError) as exc:
+            raise RuntimeError(f"No se pudo descargar o preparar FFmpeg: {exc}") from exc
+        finally:
+            archive_path.unlink(missing_ok=True)
+            temporary_executable.unlink(missing_ok=True)
+
+    try:
+        subprocess.run([str(executable), "-version"], check=True, capture_output=True, timeout=20)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"FFmpeg no quedó disponible en {executable}.") from exc
+    return str(executable)
 
 
 class DownloadCancelled(Exception):
@@ -120,7 +234,7 @@ def download_youtube_video(
         plugin_id="youtube-dl",
         operation="download-video",
         status="running",
-        message="Descargando video de YouTube.",
+        message=("Descargando audio de YouTube." if download_settings.output_format in ("mp3", "wav") else "Descargando video de YouTube."),
     )
     db.add(task)
     db.commit()
@@ -144,42 +258,54 @@ def download_youtube_video(
                 task.progress = min(downloaded / total, 0.99) if total else None
                 speed = status.get("speed")
                 speed_text = f" · {speed / 1_000_000:.2f} MB/s" if speed else ""
-                task.message = f"Descargando video{speed_text}"
+                task.message = f"Descargando {media_label}{speed_text}"
                 db.commit()
                 last_progress_write = now
         elif status.get("status") == "finished":
             task.progress = 0.99
-            task.message = "Procesando video."
+            task.message = f"Procesando {media_label}."
             db.commit()
         if task.cancel_requested:
             raise DownloadCancelled
 
-    options = {
-        "ffmpeg_location": imageio_ffmpeg.get_ffmpeg_exe(),
-        "noplaylist": True,
-        "progress_hooks": [report_progress],
-        "quiet": True,
-        "no_warnings": True,
-    }
     output_format = download_settings.output_format
     audio_format = output_format in ("mp3", "wav")
-    if audio_format:
-        options["format"] = "bestaudio/best"
-        options["postprocessors"] = [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": output_format,
-            "preferredquality": "320" if output_format == "mp3" else "0",
-        }]
-    else:
-        height_filter = "" if download_settings.quality == "best" else f"[height<={download_settings.quality}]"
-        source_video_ext, source_audio_ext = ("webm", "webm") if output_format == "webm" else ("mp4", "m4a")
-        matching_formats = (
-            f"bestvideo{height_filter}[ext={source_video_ext}]+bestaudio[ext={source_audio_ext}]"
-            f"/best{height_filter}[ext={source_video_ext}]/best[ext={source_video_ext}]"
-        )
-        options["format"] = matching_formats
-        options["postprocessors"] = [{"key": "FFmpegVideoRemuxer", "preferedformat": output_format}]
+    media_label = "audio" if audio_format else "video"
     try:
+        if audio_format:
+            task.message = "Comprobando FFmpeg y descargándolo si hace falta."
+            db.commit()
+            ffmpeg_location = _ensure_audio_ffmpeg(settings.data_dir)
+        else:
+            ffmpeg_location = imageio_ffmpeg.get_ffmpeg_exe()
+        options = {
+            "ffmpeg_location": ffmpeg_location,
+            "noplaylist": True,
+            "progress_hooks": [report_progress],
+            "quiet": True,
+            "no_warnings": True,
+        }
+        if audio_format:
+            options["format"] = "bestaudio/best"
+            options["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": output_format,
+                "preferredquality": (
+                    download_settings.quality
+                    if download_settings.quality in ("320", "256", "192", "128")
+                    else "320"
+                ) if output_format == "mp3" else "0",
+            }]
+        else:
+            height_filter = "" if download_settings.quality == "best" else f"[height<={download_settings.quality}]"
+            source_video_ext, source_audio_ext = ("webm", "webm") if output_format == "webm" else ("mp4", "m4a")
+            matching_formats = (
+                f"bestvideo{height_filter}[ext={source_video_ext}]+bestaudio[ext={source_audio_ext}]"
+                f"/best{height_filter}[ext={source_video_ext}]/best[ext={source_video_ext}]"
+            )
+            options["format"] = matching_formats
+            postprocessor = "FFmpegVideoConvertor" if output_format == "mov" else "FFmpegVideoRemuxer"
+            options["postprocessors"] = [{"key": postprocessor, "preferedformat": output_format}]
         temporary = tempfile.TemporaryDirectory(
             prefix="youtube-dl-",
             dir=settings.data_dir,
@@ -189,11 +315,31 @@ def download_youtube_video(
         options["outtmpl"] = str(output_dir / "%(id)s.%(ext)s")
         with yt_dlp.YoutubeDL(options) as downloader:
             info = downloader.extract_info(body.url, download=True)
-            downloaded_path = Path(info.get("filepath") or downloader.prepare_filename(info))
+            reported_paths = [
+                info.get("filepath"),
+                info.get("_filename"),
+                downloader.prepare_filename(info),
+            ]
+            requested_downloads = info.get("requested_downloads") or []
+            reported_paths.extend(item.get("filepath") for item in requested_downloads if isinstance(item, dict))
+        # Prefer the requested final extension: reported paths can refer to
+        # yt-dlp's pre-FFmpeg source file, which may still exist after conversion.
+        candidates = [
+            path for path in output_dir.rglob("*")
+            if path.is_file() and not path.name.endswith((".part", ".ytdl"))
+        ]
+        downloaded_path = next((path for path in candidates if path.suffix.lower() == f".{output_format}"), None)
+        if downloaded_path is None:
+            downloaded_path = next(
+                (Path(path) for path in reported_paths if path and Path(path).is_file()),
+                None,
+            )
+        if downloaded_path is None and len(candidates) == 1:
+            downloaded_path = candidates[0]
         db.refresh(task)
         if task.cancel_requested:
             raise DownloadCancelled
-        if not downloaded_path.is_file():
+        if downloaded_path is None or not downloaded_path.is_file():
             raise FileNotFoundError("yt-dlp no produjo el archivo esperado")
 
         files_dir.mkdir(parents=True, exist_ok=True)
@@ -226,7 +372,10 @@ def download_youtube_video(
         ))
         task.status = "completed"
         task.progress = 1.0
-        task.message = f"Descarga completada · {output_path}" if body.save_to_output_directory else "Descarga completada."
+        if body.save_to_output_directory:
+            task.message = f"{media_label.capitalize()} guardado en: {output_path}"
+        else:
+            task.message = f"Descarga de {media_label} completada."
         task.finished_at = utcnow()
         db.commit()
     except DownloadCancelled:
@@ -239,7 +388,7 @@ def download_youtube_video(
     except yt_dlp.utils.DownloadError as exc:
         detail = str(exc).replace(body.url, "[URL]").strip()
         log.warning("YouTube download failed: %s", detail)
-        message = "No se pudo descargar ese video de YouTube."
+        message = f"No se pudo descargar ese {media_label} de YouTube."
         if detail:
             message = f"{message} Detalle: {detail[:400]}"
         task.status = "failed"
@@ -256,7 +405,7 @@ def download_youtube_video(
         for sensitive_path in (str(settings.data_dir), download_settings.output_directory):
             detail = detail.replace(sensitive_path, "[CARPETA]")
         detail = detail.strip()
-        message = "Ocurrió un error al descargar el video."
+        message = f"Ocurrió un error al descargar el {media_label}."
         if detail:
             message = f"{message} Detalle: {type(exc).__name__}: {detail[:300]}"
         task.status = "failed"

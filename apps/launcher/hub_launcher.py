@@ -574,14 +574,22 @@ class LauncherApp(tk.Tk):
         RoundedButton(directory_row, text="Examinar…", command=choose_directory, bg="#1f2937", hover_bg="#374151", fg="#ffffff", radius=10, padx=12, pady=8, canvas_bg=settings_bg).pack(side="left", padx=(8, 0))
 
         format_labels = {"mp4": "MP4", "webm": "WEBM", "mov": "MOV", "mp3": "MP3 (solo audio)", "wav": "WAV (solo audio)"}
-        quality_labels = {"best": "Máxima disponible", "2160": "2160p (4K)", "1440": "1440p", "1080": "1080p", "720": "720p", "480": "480p"}
+        video_quality_labels = {"best": "Máxima disponible", "2160": "2160p (4K)", "1440": "1440p", "1080": "1080p", "720": "720p", "480": "480p"}
+        audio_quality_labels = {"best": "Máxima disponible", "320": "320 kbps", "256": "256 kbps", "192": "192 kbps", "128": "128 kbps"}
         format_var = tk.StringVar(value=format_labels[config["output_format"]])
-        quality_var = tk.StringVar(value=quality_labels[config["quality"]])
+        quality_var = tk.StringVar()
 
         tk.Label(content, text="Formato", bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
         def update_video_options(_value=None) -> None:
             audio_only = format_var.get() in (format_labels["mp3"], format_labels["wav"])
-            quality_menu.configure(state="disabled" if audio_only else "normal")
+            choices = audio_quality_labels if audio_only else video_quality_labels
+            current_key = next((key for key, label in choices.items() if label == quality_var.get()), "best")
+            quality_label_var.set("Calidad de audio" if audio_only else "Resolución máxima")
+            quality_var.set(choices[current_key])
+            menu = quality_menu["menu"]
+            menu.delete(0, "end")
+            for label in choices.values():
+                menu.add_command(label=label, command=lambda value=label: quality_var.set(value))
 
         format_menu = tk.OptionMenu(
             content,
@@ -607,8 +615,9 @@ class LauncherApp(tk.Tk):
             font=("Segoe UI", 10),
         )
         format_menu.pack(fill="x", ipady=4, pady=(0, 14))
-        tk.Label(content, text="Resolución máxima", bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
-        quality_menu = tk.OptionMenu(content, quality_var, *quality_labels.values())
+        quality_label_var = tk.StringVar(value="Resolución máxima")
+        tk.Label(content, textvariable=quality_label_var, bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
+        quality_menu = tk.OptionMenu(content, quality_var, *video_quality_labels.values())
         quality_menu.configure(
             bg="#ffffff",
             fg=settings_fg,
@@ -634,7 +643,7 @@ class LauncherApp(tk.Tk):
             values = {
                 "output_directory": directory_var.get().strip(),
                 "output_format": next(key for key, label in format_labels.items() if label == format_var.get()),
-                "quality": next(key for key, label in quality_labels.items() if label == quality_var.get()),
+                "quality": next(key for key, label in (audio_quality_labels if format_var.get() in (format_labels["mp3"], format_labels["wav"]) else video_quality_labels).items() if label == quality_var.get()),
             }
             try:
                 self._download_config = save_youtube_downloader_settings(values)
@@ -680,7 +689,8 @@ class LauncherApp(tk.Tk):
             return
 
         self._downloading = True
-        self._download_status.set("Descargando video…")
+        is_audio = self._download_config and self._download_config.get("output_format") in ("mp3", "wav")
+        self._download_status.set("Descargando audio…" if is_audio else "Descargando video…")
         if self._download_progressbar is not None:
             self._download_progressbar.configure(value=0)
             self._download_progressbar.pack(fill="x", pady=(16, 0), before=self._download_status_label)
@@ -694,7 +704,8 @@ class LauncherApp(tk.Tk):
             try:
                 config = fetch_youtube_downloader_settings()
                 path = download_youtube_video(url, download_dir=Path(config["output_directory"]))
-                self._results.put(("download_ok", (tool.plugin_id, path)))
+                is_audio = config.get("output_format") in ("mp3", "wav")
+                self._results.put(("download_ok", (tool.plugin_id, path, is_audio)))
             except BackendError as exc:
                 self._results.put(("download_error", (tool.plugin_id, str(exc))))
             finally:
@@ -722,7 +733,7 @@ class LauncherApp(tk.Tk):
                 self._connected = kind == "ok"
                 self._tools = payload if kind == "ok" else []
                 n = len(self._tools)
-                self.status.config(text=f"● {n} {'herramienta' if n == 1 else 'herramientas'}" if self._connected else "● Sin conexión")
+                self.status.config(text=f"● {n} {'plugin' if n == 1 else 'plugins'}" if self._connected else "● Sin conexión")
                 self._render()
             elif kind == "download_progress":
                 tool_id, progress, message = payload
@@ -734,10 +745,11 @@ class LauncherApp(tk.Tk):
                         self._download_progressbar.configure(value=(progress or 0) * 100)
             else:
                 self._downloading = False
-                tool_id, result = payload
+                tool_id, result, is_audio = payload
                 if self._active_tool and self._active_tool.plugin_id == tool_id and self._download_status is not None:
                     if kind == "download_ok":
-                        self._download_status.set(f"Video guardado en: {result}")
+                        media_label = "Audio" if is_audio else "Video"
+                        self._download_status.set(f"{media_label} guardado en: {result}")
                         if self._download_status_label is not None:
                             self._download_status_label.config(fg="#38bdf8")
                         if self._download_progressbar is not None:

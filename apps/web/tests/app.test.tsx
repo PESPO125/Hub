@@ -98,7 +98,8 @@ describe("detalle de plugin", () => {
     expect(within(dialog).queryByText("Carpeta de descarga")).not.toBeInTheDocument();
     expect(within(dialog).queryByText("Priorizar")).not.toBeInTheDocument();
     await userEvent.selectOptions(within(dialog).getByLabelText("Formato"), "wav");
-    expect(within(dialog).getByLabelText("Resolución máxima")).toBeDisabled();
+    expect(within(dialog).getByLabelText("Calidad de audio")).toBeEnabled();
+    await userEvent.selectOptions(within(dialog).getByLabelText("Calidad de audio"), "192");
     await userEvent.selectOptions(within(dialog).getByLabelText("Formato"), "mp4");
     await userEvent.selectOptions(within(dialog).getByLabelText("Resolución máxima"), "1080");
     await userEvent.click(within(dialog).getByRole("button", { name: "Guardar" }));

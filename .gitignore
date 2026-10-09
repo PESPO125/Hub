@@ -5,6 +5,8 @@ __pycache__/
 data/*
 !data/.gitkeep
 !data/README.md
+# Herramientas descargadas localmente; nunca forman parte del repositorio.
+data/.tools/
 dist/
 *.sqlite3
 *.egg-info/

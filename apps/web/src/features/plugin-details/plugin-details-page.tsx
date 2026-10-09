@@ -33,6 +33,13 @@ const QUALITY_OPTIONS: { value: YoutubeDownloaderSettings["quality"]; label: str
   { value: "720", label: "720p" },
   { value: "480", label: "480p" },
 ];
+const AUDIO_QUALITY_OPTIONS: { value: YoutubeDownloaderSettings["quality"]; label: string }[] = [
+  { value: "best", label: "Máxima disponible" },
+  { value: "320", label: "320 kbps" },
+  { value: "256", label: "256 kbps" },
+  { value: "192", label: "192 kbps" },
+  { value: "128", label: "128 kbps" },
+];
 
 function YoutubeSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -42,7 +49,11 @@ function YoutubeSettingsDialog({ open, onClose }: { open: boolean; onClose: () =
   const [draft, setDraft] = useState<YoutubeDownloaderSettings | null>(null);
 
   useEffect(() => {
-    if (query.data) setDraft(query.data);
+    if (query.data) {
+      const audioOnly = query.data.output_format === "mp3" || query.data.output_format === "wav";
+      const validAudioQuality = ["best", "320", "256", "192", "128"].includes(query.data.quality);
+      setDraft({ ...query.data, quality: audioOnly && !validAudioQuality ? "best" : query.data.quality });
+    }
   }, [query.data]);
 
   useEffect(() => {
@@ -81,20 +92,22 @@ function YoutubeSettingsDialog({ open, onClose }: { open: boolean; onClose: () =
             <>
               <label className="block space-y-1.5 text-sm">
                 <span className="font-medium text-black">Formato</span>
-                <select value={draft.output_format} onChange={(event) => update("output_format", event.target.value as YoutubeDownloaderSettings["output_format"])}
+                <select value={draft.output_format} onChange={(event) => {
+                  const output_format = event.target.value as YoutubeDownloaderSettings["output_format"];
+                  setDraft((current) => current ? { ...current, output_format, quality: "best" } : current);
+                }}
                   className="h-9 w-full rounded-md border border-gray-400 bg-white px-3 text-sm text-black">
                   <option value="mp4">MP4</option><option value="webm">WEBM</option><option value="mov">MOV</option>
                   <option value="mp3">MP3 (solo audio)</option><option value="wav">WAV (solo audio)</option>
                 </select>
               </label>
               <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-black">Resolución máxima</span>
-                <select value={draft.quality} disabled={audioOnly} onChange={(event) => update("quality", event.target.value as YoutubeDownloaderSettings["quality"])}
+                <span className="font-medium text-black">{audioOnly ? "Calidad de audio" : "Resolución máxima"}</span>
+                <select value={draft.quality} onChange={(event) => update("quality", event.target.value as YoutubeDownloaderSettings["quality"])}
                   className="h-9 w-full rounded-md border border-gray-400 bg-white px-3 text-sm text-black">
-                  {QUALITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  {(audioOnly ? AUDIO_QUALITY_OPTIONS : QUALITY_OPTIONS).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              {audioOnly && <p className="text-xs text-gray-700">La resolución solo aplica al video.</p>}
             </>
           )}
         </div>
@@ -111,6 +124,7 @@ function YoutubeDownloader({ enabled }: { enabled: boolean }) {
   const [url, setUrl] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const download = useDownloadYoutubeVideo();
+  const { data: downloaderSettings } = useYoutubeDownloaderSettings();
   const { data: tasks } = useTasks(undefined, 50, download.isPending);
   const activeTask = tasks?.items.find((task) =>
     task.plugin_id === "youtube-dl" && task.operation === "download-video" && task.status === "running",
@@ -167,7 +181,11 @@ function YoutubeDownloader({ enabled }: { enabled: boolean }) {
           </div>
         )}
         {download.isError && <p role="alert" className="mt-3 text-sm text-destructive">{download.error.message}</p>}
-        {download.isSuccess && <p role="status" className="mt-3 text-sm text-success">Video descargado y guardado.</p>}
+        {download.isSuccess && <p role="status" className="mt-3 text-sm text-success">
+          {downloaderSettings?.output_format === "mp3" || downloaderSettings?.output_format === "wav"
+            ? "Audio descargado y guardado."
+            : "Video descargado y guardado."}
+        </p>}
       </Section>
       <YoutubeSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>

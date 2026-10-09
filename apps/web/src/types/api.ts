@@ -45,7 +45,7 @@ export interface StoredFile {
 export interface YoutubeDownloaderSettings {
   output_directory: string;
   output_format: "mp4" | "webm" | "mov" | "mp3" | "wav";
-  quality: "best" | "2160" | "1440" | "1080" | "720" | "480";
+  quality: "best" | "320" | "256" | "192" | "128" | "2160" | "1440" | "1080" | "720" | "480";
 }
 
 export interface AppInfo {
