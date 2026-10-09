@@ -1,11 +1,14 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
+from app.api.deps import get_app_settings, get_db
+from app.core.config import Settings
 from app.core.errors import AppError
 from app.db.session import StoredFile, Task
 from app.modules.tasks.state import can_transition
@@ -59,3 +62,24 @@ def list_files(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0
     items = [{"id": f.id, "task_id": f.task_id, "display_name": f.display_name, "size_bytes": f.size_bytes,
               "mime_type": f.mime_type, "created_at": f.created_at, "expires_at": f.expires_at} for f in rows]
     return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/files/{file_id}/download")
+def download_file(
+    file_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_app_settings),
+):
+    stored_file = db.get(StoredFile, file_id)
+    if stored_file is None:
+        raise AppError(404, "file_not_found", "Archivo no encontrado.")
+
+    storage_root = (settings.data_dir / "files").resolve()
+    file_path = (storage_root / stored_file.storage_key).resolve()
+    if not file_path.is_relative_to(storage_root) or not file_path.is_file():
+        raise AppError(404, "file_not_found", "El archivo ya no está disponible.")
+    return FileResponse(
+        file_path,
+        filename=stored_file.display_name,
+        media_type=stored_file.mime_type or "application/octet-stream",
+    )

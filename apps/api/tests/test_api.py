@@ -97,6 +97,20 @@ def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir
     assert response.content == b"video-data"
     assert "video123.mp4" in response.headers["content-disposition"]
 
+    task_page = client.get("/api/v1/tasks").json()
+    assert task_page["total"] == 1
+    assert task_page["items"][0]["plugin_id"] == "youtube-dl"
+    assert task_page["items"][0]["operation"] == "download-video"
+    assert task_page["items"][0]["status"] == "completed"
+
+    file_page = client.get("/api/v1/files").json()
+    assert file_page["total"] == 1
+    stored_file = file_page["items"][0]
+    assert stored_file["task_id"] == task_page["items"][0]["id"]
+    assert stored_file["size_bytes"] == len(b"video-data")
+    stored_response = client.get(f"/api/v1/files/{stored_file['id']}/download")
+    assert stored_response.content == b"video-data"
+
 
 def test_youtube_download_reports_sanitized_yt_dlp_error(client, plugins_dir, monkeypatch):
     from app.api.v1.endpoints import youtube_dl
@@ -125,6 +139,54 @@ def test_youtube_download_reports_sanitized_yt_dlp_error(client, plugins_dir, mo
     assert response.status_code == 422
     assert "Video unavailable" in response.json()["error"]["message"]
     assert url not in response.json()["error"]["message"]
+    task = client.get("/api/v1/tasks").json()["items"][0]
+    assert task["status"] == "failed"
+    assert task["error"]["code"] == "download_failed"
+    assert client.get("/api/v1/files").json()["total"] == 0
+
+
+def test_youtube_download_cancellation_stops_running_task(client, plugins_dir, monkeypatch):
+    from app.api.v1.endpoints import youtube_dl
+    from tempfile import TemporaryDirectory
+
+    write_plugin(plugins_dir, "youtube-dl", good("youtube-dl"))
+    client.post("/api/v1/plugins/refresh")
+    client.patch("/api/v1/plugins/youtube-dl/state", json={"enabled": True})
+
+    def create_temporary_directory(*, prefix, dir, ignore_cleanup_errors=False):
+        assert ignore_cleanup_errors is True
+        return TemporaryDirectory(prefix=prefix, dir=dir, ignore_cleanup_errors=ignore_cleanup_errors)
+
+    monkeypatch.setattr(youtube_dl.tempfile, "TemporaryDirectory", create_temporary_directory)
+
+    class CancelledYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def extract_info(self, _url, download):
+            assert download is True
+            task = client.get("/api/v1/tasks").json()["items"][0]
+            cancel_response = client.post(f"/api/v1/tasks/{task['id']}/cancel")
+            assert cancel_response.status_code == 200
+            self.options["progress_hooks"][0](
+                {"status": "downloading", "downloaded_bytes": 25, "total_bytes": 100}
+            )
+            raise AssertionError("progress hook should stop the download")
+
+    monkeypatch.setattr(youtube_dl.yt_dlp, "YoutubeDL", CancelledYoutubeDL)
+    response = client.post("/api/v1/plugins/youtube-dl/download", json={"url": "https://youtu.be/video"})
+    assert response.status_code == 409
+    assert response.json()["error"]["message"] == "La descarga fue cancelada."
+    task = client.get("/api/v1/tasks").json()["items"][0]
+    assert task["status"] == "cancelled"
+    assert task["progress"] == 0.25
+    assert client.get("/api/v1/files").json()["total"] == 0
 
 
 def test_relative_paths_anchor_to_repo_root(monkeypatch, tmp_path):

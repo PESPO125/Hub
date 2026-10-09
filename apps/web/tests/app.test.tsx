@@ -107,6 +107,22 @@ describe("detalle de plugin", () => {
   });
 });
 
+describe("archivos y resultados", () => {
+  it("muestra y permite descargar archivos registrados", async () => {
+    const file = {
+      id: "file-1", task_id: "task-1", display_name: "video.mp4", size_bytes: 10,
+      mime_type: "video/mp4", created_at: "2026-10-09T10:00:00Z", expires_at: null,
+    };
+    mockApi({ ...baseRoutes(), "/files": { body: { items: [file], total: 1, limit: 50, offset: 0 } } });
+    renderApp("/files");
+    expect(await screen.findByText("video.mp4")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Descargar video.mp4" })).toHaveAttribute(
+      "href",
+      "/api/v1/files/file-1/download",
+    );
+  });
+});
+
 describe("errores y carga", () => {
   it("backend caído: mensaje claro y reintento", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fail"); }));
