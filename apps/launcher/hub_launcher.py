@@ -17,8 +17,8 @@ import urllib.request
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
-from tkinter import ttk
 from tempfile import NamedTemporaryFile
+from tkinter import filedialog, ttk
 
 API_URL = os.environ.get("HUB_API_URL", "http://127.0.0.1:8000").rstrip("/")
 WEB_URL = os.environ.get("HUB_WEB_URL", "http://localhost:5173").rstrip("/")
@@ -46,6 +46,39 @@ def fetch_catalog(api_url: str | None = None, timeout: float = 2.5) -> dict:
         raise BackendError(str(exc)) from exc
 
 
+def _api_request(path: str, method: str = "GET", body: dict | None = None, timeout: float = 5) -> dict:
+    api_url = API_URL.rstrip("/")
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    headers = {"Accept": "application/json"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(f"{api_url}/api/v1/{path.lstrip('/')}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8"))
+            message = detail.get("error", {}).get("message", f"El backend respondió {exc.code}.")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            message = f"El backend respondió {exc.code}."
+        raise BackendError(message) from exc
+    except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError, OSError) as exc:
+        raise BackendError(str(exc)) from exc
+
+
+def fetch_youtube_downloader_settings() -> dict:
+    return _api_request("plugins/youtube-dl/config")
+
+
+def save_youtube_downloader_settings(settings: dict) -> dict:
+    return _api_request("plugins/youtube-dl/config", "PUT", settings)
+
+
+def fetch_tasks(limit: int = 20) -> list[dict]:
+    return _api_request(f"tasks?limit={limit}").get("items", [])
+
+
 def download_youtube_video(
     url: str,
     api_url: str | None = None,
@@ -55,7 +88,7 @@ def download_youtube_video(
     api_url = (api_url or API_URL).rstrip("/")
     req = urllib.request.Request(
         f"{api_url}/api/v1/plugins/youtube-dl/download",
-        data=json.dumps({"url": url}).encode("utf-8"),
+        data=json.dumps({"url": url, "save_to_output_directory": True}).encode("utf-8"),
         headers={"Accept": "application/octet-stream", "Content-Type": "application/json"},
         method="POST",
     )
@@ -68,6 +101,10 @@ def download_youtube_video(
             if filename in {"", ".", ".."}:
                 filename = "youtube-video"
             destination = target_dir / filename
+            if destination.is_file():
+                while response.read(1024 * 1024):
+                    pass
+                return destination
             suffix = destination.suffix
             stem = destination.stem
             index = 1
@@ -112,8 +149,8 @@ def filter_tools(tools: list[Tool], term: str) -> list[Tool]:
 
 
 class RoundedButton(tk.Canvas):
-    """Botón personalizado con esquinas verdaderamente redondeadas y efectos hover fluidos."""
-    def __init__(self, parent, text, command, bg="#21262d", hover_bg="#30363d", fg="#f0f6fc", font=("Segoe UI", 10, "bold"), radius=8, padx=16, pady=8, canvas_bg="#0f1117"):
+    """Botón personalizado con esquinas muy redondeadas (estilo píldora) y efectos fluidos."""
+    def __init__(self, parent, text, command, bg="#1f2937", hover_bg="#374151", fg="#f8fafc", font=("Segoe UI", 10, "bold"), radius=12, padx=18, pady=10, canvas_bg="#0b0f19"):
         self.font = font
         self.text = text
         self.command = command
@@ -122,7 +159,6 @@ class RoundedButton(tk.Canvas):
         self.fg = fg
         self.radius = radius
         
-        # Crear etiqueta temporal para medir texto
         dummy = tk.Label(parent, text=text, font=font)
         w = dummy.winfo_reqwidth() + padx * 2
         h = dummy.winfo_reqheight() + pady * 2
@@ -135,7 +171,6 @@ class RoundedButton(tk.Canvas):
         
         self._draw(self.bg)
         
-        # Eventos
         self.bind("<Button-1>", lambda e: self.command())
         self.bind("<Enter>", lambda e: self._draw(self.hover_bg))
         self.bind("<Leave>", lambda e: self._draw(self.bg))
@@ -146,7 +181,6 @@ class RoundedButton(tk.Canvas):
         w = self.w
         h = self.h
         
-        # Dibujar formas redondeadas con el canvas
         self.create_arc(0, 0, r*2, r*2, start=90, extent=90, fill=color, outline=color)
         self.create_arc(w-r*2, 0, w, r*2, start=0, extent=90, fill=color, outline=color)
         self.create_arc(0, h-r*2, r*2, h, start=180, extent=90, fill=color, outline=color)
@@ -158,35 +192,65 @@ class RoundedButton(tk.Canvas):
         self.create_text(w/2, h/2, text=self.text, fill=self.fg, font=self.font)
 
 
+class SettingsIconButton(tk.Canvas):
+    """Botón con el icono de configuración (sliders) rediseñado limpiamente."""
+    def __init__(self, parent, command, bg="#111827", hover_bg="#1f2937", fg="#f8fafc"):
+        super().__init__(parent, width=36, height=36, bg=bg, highlightthickness=0, cursor="hand2")
+        self.command = command
+        self.bg = bg
+        self.hover_bg = hover_bg
+        self.fg = fg
+        
+        self._draw(self.bg)
+        self.bind("<Button-1>", lambda e: self.command())
+        self.bind("<Enter>", lambda e: self._draw(self.hover_bg))
+        self.bind("<Leave>", lambda e: self._draw(self.bg))
+
+    def _draw(self, color):
+        self.delete("all")
+        self.create_rectangle(0, 0, 36, 36, fill=color, outline=color)
+        self.create_line(8, 13, 28, 13, fill=self.fg, width=2)
+        self.create_oval(12, 10, 18, 16, fill=self.bg, outline=self.fg, width=2)
+        self.create_line(8, 23, 28, 23, fill=self.fg, width=2)
+        self.create_oval(20, 20, 26, 26, fill=self.bg, outline=self.fg, width=2)
+
+
 class LauncherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Hub  --  Cooking")
-        self.geometry("580x740")
-        self.minsize(480, 500)
+        self.title("Hub   ---   Cooking")
+        self.geometry("600x760")
+        self.minsize(500, 520)
         
-        # Paleta Dark Modern
-        self.bg_color = "#0f1117"
-        self.card_bg = "#161b22"
-        self.border_color = "#30363d"
-        self.text_main = "#f0f6fc"
-        self.text_muted = "#8b949e"
-        self.accent_color = "#8b5cf6"
-        self.accent_hover = "#7c3aed"
+        self.bg_color = "#0b0f19"
+        self.card_bg = "#111827"
+        self.border_color = "#1f2937"
+        self.text_main = "#f8fafc"
+        self.text_muted = "#94a3b8"
+        self.accent_color = "#38bdf8"
+        self.accent_hover = "#0ea5e9"
+        self.gold_color = "#eab308"      # Color amarillo/dorado solicitado[cite: 11, 12]
         
         self.configure(bg=self.bg_color)
 
         self._tools: list[Tool] = []
         self._active_tool: Tool | None = None
         self._tool_url: tk.StringVar | None = None
+        self._tool_entry: tk.Entry | None = None
         self._download_status: tk.StringVar | None = None
         self._download_status_label: tk.Label | None = None
+        self._download_progressbar: ttk.Progressbar | None = None
+        self._download_config: dict | None = None
+        self._settings_window: tk.Toplevel | None = None
         self._downloading = False
         self._connected = False
         self._results: queue.Queue = queue.Queue()
         
         self._setup_styles()
         self._build()
+        
+        self.bind_all("<Button-1>", self._handle_global_click, add="+")
+        
         self.after(100, self._poll)
         self.refresh()
 
@@ -196,26 +260,38 @@ class LauncherApp(tk.Tk):
         style.configure(".", background=self.bg_color, foreground=self.text_main, font=("Segoe UI", 10))
         style.configure("TFrame", background=self.bg_color)
         style.configure("TLabel", background=self.bg_color, foreground=self.text_main)
-        style.configure("Muted.TLabel", background=self.bg_color, foreground=self.text_muted, font=("Segoe UI", 9))
+        style.configure("Muted.TLabel", background=self.bg_color, foreground=self.gold_color, font=("Segoe UI", 9)) # Aplicado color dorado/amarillo aquí[cite: 11, 12]
+        style.configure("Download.Horizontal.TProgressbar", troughcolor=self.border_color, background="#38bdf8")
 
     def _build(self) -> None:
-        pad = {"padx": 28}
+        pad = {"padx": 32}
         
-        # Cabecera
-        head = ttk.Frame(self)
-        head.pack(fill="x", pady=(28, 20), **pad)
-        ttk.Label(head, text="HUB", font=("Segoe UI", 22, "bold")).pack(side="left")
-        self.status = ttk.Label(head, text="Conectando…", style="Muted.TLabel")
+        self.head = ttk.Frame(self)
+        self.head.pack(fill="x", pady=(28, 20), **pad)
+        self.header_title_lbl = ttk.Label(self.head, text="HUB", font=("Segoe UI", 22, "bold"))
+        self.header_title_lbl.pack(side="left")
+        self.back_btn = RoundedButton(
+            self.head,
+            text="← Back",
+            command=self._close_tool,
+            bg="#1f2937",
+            hover_bg="#374151",
+            fg=self.text_main,
+            radius=10,
+            padx=14,
+            pady=7,
+            canvas_bg=self.bg_color,
+        )
+        self.status = ttk.Label(self.head, text="Conectando…", style="Muted.TLabel")
         self.status.pack(side="right", pady=8)
 
-        # Barra de búsqueda
         self.search_frame = tk.Frame(self, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1, bd=0)
         self.search_frame.pack(fill="x", pady=(0, 24), **pad)
         
         self.query = tk.StringVar()
         self.query.trace_add("write", lambda *_: self._render())
         
-        search_entry = tk.Entry(
+        self.search_entry = tk.Entry(
             self.search_frame, 
             textvariable=self.query, 
             bg=self.card_bg, 
@@ -224,10 +300,8 @@ class LauncherApp(tk.Tk):
             relief="flat", 
             font=("Segoe UI", 11)
         )
-        search_entry.pack(fill="x", ipady=12, ipadx=16)
-        search_entry.focus_set()
+        self.search_entry.pack(fill="x", ipady=12, ipadx=16)
 
-        # Contenedor principal de la lista (Sin barra de scroll lateral)
         self.body = ttk.Frame(self)
         self.body.pack(fill="both", expand=True, **pad)
         
@@ -240,19 +314,18 @@ class LauncherApp(tk.Tk):
         
         self.canvas.pack(side="left", fill="both", expand=True)
 
-        # Pie de página espaciado con botones redondeados reales
         foot = ttk.Frame(self)
         foot.pack(fill="x", pady=24, **pad)
         
         RoundedButton(
             foot, 
-            text="Refresh", 
+            text="Actualizar", 
             command=self.refresh,
-            bg="#21262d",
-            hover_bg="#30363d",
+            bg="#1f2937",
+            hover_bg="#374151",
             fg=self.text_main,
-            radius=6,
-            padx=16,
+            radius=12,
+            padx=18,
             pady=10,
             canvas_bg=self.bg_color
         ).pack(side="left")
@@ -263,12 +336,17 @@ class LauncherApp(tk.Tk):
             command=lambda: webbrowser.open(WEB_URL),
             bg=self.accent_color,
             hover_bg=self.accent_hover,
-            fg="#ffffff",
-            radius=6,
-            padx=16,
+            fg="#0b0f19",
+            radius=12,
+            padx=18,
             pady=10,
             canvas_bg=self.bg_color
         ).pack(side="right")
+
+    def _handle_global_click(self, event) -> None:
+        widget = event.widget
+        if not isinstance(widget, tk.Entry):
+            self.focus_set()
 
     def _clear(self) -> None:
         for w in self.inner.winfo_children():
@@ -282,7 +360,7 @@ class LauncherApp(tk.Tk):
         lbl_title = tk.Label(msg_frame, text=title, font=("Segoe UI", 13, "bold"), bg=self.card_bg, fg=self.text_main)
         lbl_title.pack(anchor="w", pady=(0, 8))
         
-        lbl_detail = tk.Label(msg_frame, text=detail, font=("Segoe UI", 10), bg=self.card_bg, fg=self.text_muted, wraplength=440, justify="left")
+        lbl_detail = tk.Label(msg_frame, text=detail, font=("Segoe UI", 10), bg=self.card_bg, fg=self.text_muted, wraplength=460, justify="left")
         lbl_detail.pack(anchor="w", pady=(0, 20))
         
         if action:
@@ -292,9 +370,9 @@ class LauncherApp(tk.Tk):
                 command=action[1], 
                 bg=self.accent_color, 
                 hover_bg=self.accent_hover,
-                fg="#ffffff", 
-                radius=6,
-                padx=16, 
+                fg="#0b0f19", 
+                radius=12,
+                padx=18, 
                 pady=10,
                 canvas_bg=self.card_bg
             ).pack(anchor="w")
@@ -326,13 +404,12 @@ class LauncherApp(tk.Tk):
         
         for t in shown:
             card = tk.Frame(self.inner, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1)
-            card.pack(fill="x", pady=12, ipadx=18, ipady=14)
+            card.pack(fill="x", pady=10, ipadx=20, ipady=16)
 
             top_row = tk.Frame(card, bg=self.card_bg)
-            top_row.pack(fill="x", pady=(0, 8))
+            top_row.pack(fill="x", pady=(0, 6))
             
-            tk.Label(top_row, text=t.name, font=("Segoe UI", 11, "bold"), bg=self.card_bg, fg=self.text_main).pack(side="left")
-            tk.Label(top_row, text=t.plugin_name.upper(), font=("Segoe UI", 8, "bold"), bg=self.card_bg, fg=self.accent_color).pack(side="right")
+            tk.Label(top_row, text=t.name, font=("Segoe UI", 12, "bold"), bg=self.card_bg, fg=self.text_main).pack(side="left")
 
             if t.description:
                 tk.Label(
@@ -341,9 +418,9 @@ class LauncherApp(tk.Tk):
                     font=("Segoe UI", 9), 
                     bg=self.card_bg, 
                     fg=self.text_muted, 
-                    wraplength=440, 
+                    wraplength=460, 
                     justify="left"
-                ).pack(anchor="w", pady=(0, 14))
+                ).pack(anchor="w", pady=(0, 12))
 
             btn_frame = tk.Frame(card, bg=self.card_bg)
             btn_frame.pack(fill="x", pady=(4, 0))
@@ -352,12 +429,12 @@ class LauncherApp(tk.Tk):
                 btn_frame, 
                 text="Iniciar", 
                 command=lambda selected=t: self._open_tool(selected),
-                bg="#21262d",
+                bg="#1f2937",
                 hover_bg=self.accent_color,
                 fg=self.text_main,
-                radius=6,
-                padx=12,
-                pady=6,
+                radius=10,
+                padx=16,
+                pady=8,
                 canvas_bg=self.card_bg
             ).pack(anchor="e")
 
@@ -374,76 +451,222 @@ class LauncherApp(tk.Tk):
     def _open_tool(self, tool: Tool) -> None:
         self._active_tool = tool
         self.search_frame.pack_forget()
+        self.header_title_lbl.pack_forget()
+        self.back_btn.pack(side="left")
         self._render_tool(tool)
 
     def _close_tool(self) -> None:
         self._active_tool = None
-        self.search_frame.pack(fill="x", before=self.body, pady=(0, 24), padx=28)
+        self._tool_entry = None
+        self.back_btn.pack_forget()
+        self.header_title_lbl.config(text="HUB")
+        self.header_title_lbl.pack(side="left")
+        self.search_frame.pack(fill="x", before=self.body, pady=(0, 24), padx=32)
         self._render()
 
     def _render_tool(self, tool: Tool) -> None:
         self._clear()
-        panel = tk.Frame(self.inner, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1)
-        panel.pack(fill="x", pady=12, ipadx=22, ipady=22)
+        
+        panel = tk.Frame(self.inner, bg=self.bg_color)
+        panel.pack(fill="x", pady=10)
 
-        RoundedButton(
-            panel,
-            text="← Volver a herramientas",
-            command=self._close_tool,
-            bg="#21262d",
-            hover_bg="#30363d",
-            fg=self.text_main,
-            radius=6,
-            padx=12,
-            pady=6,
-            canvas_bg=self.card_bg,
-        ).pack(anchor="w", pady=(0, 22))
+        title_row = tk.Frame(panel, bg=self.bg_color)
+        title_row.pack(fill="x", pady=(0, 4))
+        
+        tk.Label(title_row, text=tool.name, font=("Segoe UI", 18, "bold"), bg=self.bg_color, fg=self.text_main).pack(side="left")
+        
+        if tool.plugin_id == "youtube-dl" and tool.tool_id == "download-video":
+            SettingsIconButton(title_row, command=self._open_tool_settings, bg=self.bg_color, hover_bg="#1f2937", fg=self.text_main).pack(side="right")
 
-        tk.Label(panel, text=tool.name, font=("Segoe UI", 16, "bold"), bg=self.card_bg, fg=self.text_main).pack(anchor="w")
-        tk.Label(panel, text=tool.plugin_name, font=("Segoe UI", 9), bg=self.card_bg, fg=self.text_muted).pack(anchor="w", pady=(4, 18))
+        tk.Label(panel, text=tool.plugin_name.upper(), font=("Segoe UI", 8, "bold"), bg=self.bg_color, fg=self.accent_color).pack(anchor="w", pady=(0, 20))
 
         if tool.plugin_id == "youtube-dl" and tool.tool_id == "download-video":
-            tk.Label(panel, text="URL de YouTube", font=("Segoe UI", 10, "bold"), bg=self.card_bg, fg=self.text_main).pack(anchor="w", pady=(0, 8))
+            tk.Label(panel, text="URL de YouTube", font=("Segoe UI", 10, "bold"), bg=self.bg_color, fg=self.text_main).pack(anchor="w", pady=(0, 8))
             self._tool_url = tk.StringVar()
-            entry = tk.Entry(
+            self._tool_entry = tk.Entry(
                 panel,
                 textvariable=self._tool_url,
-                bg="#0f1117",
+                bg=self.card_bg,
                 fg=self.text_main,
                 insertbackground=self.text_main,
                 relief="flat",
                 font=("Segoe UI", 11),
             )
-            entry.pack(fill="x", ipady=10, ipadx=12)
-            entry.bind("<Return>", lambda _event: self._download_tool())
+            self._tool_entry.pack(fill="x", ipady=12, ipadx=14, pady=(0, 16))
+            self._tool_entry.bind("<Return>", lambda _event: self._download_tool())
 
             RoundedButton(
                 panel,
-                text="Descargar video",
+                text="Descargar",
                 command=self._download_tool,
                 bg=self.accent_color,
                 hover_bg=self.accent_hover,
-                fg="#ffffff",
-                radius=6,
-                padx=16,
-                pady=9,
-                canvas_bg=self.card_bg,
-            ).pack(anchor="e", pady=(14, 0))
+                fg="#0b0f19",
+                radius=12,
+                padx=20,
+                pady=10,
+                canvas_bg=self.bg_color,
+            ).pack(anchor="e")
+            
+            self._download_progressbar = ttk.Progressbar(
+                panel,
+                mode="determinate",
+                maximum=100,
+                style="Download.Horizontal.TProgressbar",
+            )
+            self._download_progressbar.pack(fill="x", pady=(16, 0))
+            self._download_progressbar.pack_forget()
+            
             self._download_status = tk.StringVar()
             self._download_status_label = tk.Label(
                 panel,
                 textvariable=self._download_status,
                 font=("Segoe UI", 9),
-                bg=self.card_bg,
+                bg=self.bg_color,
                 fg=self.text_muted,
-                wraplength=440,
+                wraplength=460,
                 justify="left",
             )
-            self._download_status_label.pack(anchor="w", pady=(12, 0))
-            entry.focus_set()
+            self._download_status_label.pack(anchor="w", pady=(8, 0))
+            self._tool_entry.focus_set()
         else:
             detail = tool.description or "Esta herramienta todavía no tiene una interfaz nativa en Hub."
-            tk.Label(panel, text=detail, font=("Segoe UI", 10), bg=self.card_bg, fg=self.text_muted, wraplength=440, justify="left").pack(anchor="w")
+            tk.Label(panel, text=detail, font=("Segoe UI", 10), bg=self.bg_color, fg=self.text_muted, wraplength=460, justify="left").pack(anchor="w")
+
+    def _open_tool_settings(self) -> None:
+        if self._settings_window is not None and self._settings_window.winfo_exists():
+            self._settings_window.lift()
+            return
+        try:
+            self._download_config = fetch_youtube_downloader_settings()
+        except BackendError as exc:
+            if self._download_status is not None:
+                self._download_status.set(str(exc))
+            return
+
+        config = self._download_config
+        window = tk.Toplevel(self)
+        self._settings_window = window
+        window.title("Preferencias de descarga")
+        window.configure(bg="#ffffff")
+        window.transient(self)
+        window.resizable(False, False)
+        window.geometry("500x500")
+        window.protocol("WM_DELETE_WINDOW", lambda: self._close_tool_settings(window))
+
+        settings_bg = "#ffffff"
+        settings_fg = "#111111"
+        content = tk.Frame(window, bg=settings_bg, padx=24, pady=22)
+        content.pack(fill="both", expand=True)
+        tk.Label(content, text="Preferencias de descarga", font=("Segoe UI", 15, "bold"), bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 20))
+
+        directory_var = tk.StringVar(value=config["output_directory"])
+        tk.Label(content, text="Carpeta de descarga", bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
+        directory_row = tk.Frame(content, bg=settings_bg)
+        directory_row.pack(fill="x", pady=(0, 16))
+        tk.Entry(directory_row, textvariable=directory_var, state="readonly", readonlybackground="#ffffff", fg=settings_fg, relief="solid", bd=1).pack(side="left", fill="x", expand=True, ipady=9, ipadx=10)
+
+        def choose_directory() -> None:
+            selected = filedialog.askdirectory(parent=window, initialdir=directory_var.get(), mustexist=False)
+            if selected:
+                directory_var.set(selected)
+
+        RoundedButton(directory_row, text="Examinar…", command=choose_directory, bg="#1f2937", hover_bg="#374151", fg="#ffffff", radius=10, padx=12, pady=8, canvas_bg=settings_bg).pack(side="left", padx=(8, 0))
+
+        format_labels = {"mp4": "MP4", "webm": "WEBM", "mov": "MOV", "mp3": "MP3 (solo audio)", "wav": "WAV (solo audio)"}
+        quality_labels = {"best": "Máxima disponible", "2160": "2160p (4K)", "1440": "1440p", "1080": "1080p", "720": "720p", "480": "480p"}
+        format_var = tk.StringVar(value=format_labels[config["output_format"]])
+        quality_var = tk.StringVar(value=quality_labels[config["quality"]])
+
+        tk.Label(content, text="Formato", bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
+        def update_video_options(_value=None) -> None:
+            audio_only = format_var.get() in (format_labels["mp3"], format_labels["wav"])
+            quality_menu.configure(state="disabled" if audio_only else "normal")
+
+        format_menu = tk.OptionMenu(
+            content,
+            format_var,
+            *format_labels.values(),
+            command=update_video_options,
+        )
+        format_menu.configure(
+            bg="#ffffff",
+            fg=settings_fg,
+            activebackground="#e5e7eb",
+            activeforeground=settings_fg,
+            anchor="w",
+            relief="solid",
+            bd=1,
+            highlightthickness=0,
+        )
+        format_menu["menu"].configure(
+            bg="#ffffff",
+            fg=settings_fg,
+            activebackground="#e5e7eb",
+            activeforeground=settings_fg,
+            font=("Segoe UI", 10),
+        )
+        format_menu.pack(fill="x", ipady=4, pady=(0, 14))
+        tk.Label(content, text="Resolución máxima", bg=settings_bg, fg=settings_fg).pack(anchor="w", pady=(0, 6))
+        quality_menu = tk.OptionMenu(content, quality_var, *quality_labels.values())
+        quality_menu.configure(
+            bg="#ffffff",
+            fg=settings_fg,
+            activebackground="#e5e7eb",
+            activeforeground=settings_fg,
+            anchor="w",
+            relief="solid",
+            bd=1,
+            highlightthickness=0,
+        )
+        quality_menu["menu"].configure(
+            bg="#ffffff",
+            fg=settings_fg,
+            activebackground="#e5e7eb",
+            activeforeground=settings_fg,
+            font=("Segoe UI", 10),
+        )
+        quality_menu.pack(fill="x", ipady=4, pady=(0, 14))
+
+        update_video_options()
+
+        def save() -> None:
+            values = {
+                "output_directory": directory_var.get().strip(),
+                "output_format": next(key for key, label in format_labels.items() if label == format_var.get()),
+                "quality": next(key for key, label in quality_labels.items() if label == quality_var.get()),
+            }
+            try:
+                self._download_config = save_youtube_downloader_settings(values)
+            except BackendError as exc:
+                self._settings_status.config(text=str(exc), fg="#b42318")
+                return
+            self._close_tool_settings(window)
+            if self._download_status is not None:
+                self._download_status.set("Preferencias guardadas.")
+            if self._download_status_label is not None:
+                self._download_status_label.config(fg="#38bdf8")
+
+        self._settings_status = tk.Label(content, text="", bg=settings_bg, fg=settings_fg, wraplength=460, justify="left")
+        self._settings_status.pack(anchor="w", pady=(0, 8))
+        RoundedButton(content, text="Guardar preferencias", command=save, bg=self.accent_color, hover_bg=self.accent_hover, fg="#0b0f19", radius=12, padx=18, pady=10, canvas_bg=settings_bg).pack(anchor="e")
+
+    def _close_tool_settings(self, window: tk.Toplevel) -> None:
+        if window.winfo_exists():
+            window.destroy()
+        self._settings_window = None
+
+    def _watch_download_progress(self, tool_id: str, stop: threading.Event) -> None:
+        while not stop.wait(0.75):
+            try:
+                task = next((
+                    row for row in fetch_tasks()
+                    if row["plugin_id"] == "youtube-dl" and row["operation"] == "download-video" and row["status"] == "running"
+                ), None)
+            except BackendError:
+                continue
+            if task is not None:
+                self._results.put(("download_progress", (tool_id, task.get("progress"), task.get("message") or "Descargando video…")))
 
     def _download_tool(self) -> None:
         if self._downloading or self._tool_url is None or self._download_status is None:
@@ -458,15 +681,25 @@ class LauncherApp(tk.Tk):
 
         self._downloading = True
         self._download_status.set("Descargando video…")
+        if self._download_progressbar is not None:
+            self._download_progressbar.configure(value=0)
+            self._download_progressbar.pack(fill="x", pady=(16, 0), before=self._download_status_label)
         if self._download_status_label is not None:
-            self._download_status_label.config(fg="#22c55e")
+            self._download_status_label.config(fg="#38bdf8")
 
         def work() -> None:
+            stop_watcher = threading.Event()
+            watcher = threading.Thread(target=self._watch_download_progress, args=(tool.plugin_id, stop_watcher), daemon=True)
+            watcher.start()
             try:
-                path = download_youtube_video(url)
+                config = fetch_youtube_downloader_settings()
+                path = download_youtube_video(url, download_dir=Path(config["output_directory"]))
                 self._results.put(("download_ok", (tool.plugin_id, path)))
             except BackendError as exc:
                 self._results.put(("download_error", (tool.plugin_id, str(exc))))
+            finally:
+                stop_watcher.set()
+                watcher.join(timeout=2)
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -491,6 +724,14 @@ class LauncherApp(tk.Tk):
                 n = len(self._tools)
                 self.status.config(text=f"● {n} {'herramienta' if n == 1 else 'herramientas'}" if self._connected else "● Sin conexión")
                 self._render()
+            elif kind == "download_progress":
+                tool_id, progress, message = payload
+                if self._active_tool and self._active_tool.plugin_id == tool_id and self._download_status is not None:
+                    self._download_status.set(message)
+                    if self._download_status_label is not None:
+                        self._download_status_label.config(fg="#38bdf8")
+                    if self._download_progressbar is not None and self._download_progressbar.winfo_manager() == "pack":
+                        self._download_progressbar.configure(value=(progress or 0) * 100)
             else:
                 self._downloading = False
                 tool_id, result = payload
@@ -498,11 +739,13 @@ class LauncherApp(tk.Tk):
                     if kind == "download_ok":
                         self._download_status.set(f"Video guardado en: {result}")
                         if self._download_status_label is not None:
-                            self._download_status_label.config(fg="#22c55e")
+                            self._download_status_label.config(fg="#38bdf8")
+                        if self._download_progressbar is not None:
+                            self._download_progressbar.configure(value=100)
                     else:
                         self._download_status.set(result)
                         if self._download_status_label is not None:
-                            self._download_status_label.config(fg="#f85149")
+                            self._download_status_label.config(fg="#f87171")
         self.after(100, self._poll)
 
 

@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Raíz del repositorio: las rutas relativas se anclan acá, no al directorio desde el que se arranca el proceso.
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
-PLATFORM_VERSION = "1.1"
+PLATFORM_VERSION = "1.2"
 API_VERSION = "v1"
 
 

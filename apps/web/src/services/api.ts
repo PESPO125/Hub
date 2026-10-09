@@ -43,7 +43,7 @@ export async function downloadYoutubeVideo(url: string): Promise<void> {
     res = await fetch(`${BASE}/plugins/youtube-dl/download`, {
       method: "POST",
       headers: { Accept: "application/octet-stream", "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, save_to_output_directory: false }),
     });
   } catch {
     throw new ApiError(0, "network_error", "No se pudo conectar con el servidor de Hub. ¿Está en ejecución el backend?");

@@ -104,6 +104,8 @@ def _pump(app, seconds=1.5):
 
 def test_gui_states(live_api, monkeypatch):
     tk = pytest.importorskip("tkinter")
+    from tkinter import ttk
+
     monkeypatch.setattr(hl, "API_URL", live_api)
     try:
         app = hl.LauncherApp()
@@ -130,20 +132,52 @@ def test_gui_states(live_api, monkeypatch):
         app.refresh()
         _pump(app)
         youtube_tool = next(t for t in app._tools if t.plugin_id == "youtube-dl")
-        launch_button = next(
-            widget for widget in descendants(app.inner)
-            if isinstance(widget, hl.RoundedButton) and widget.text == "Iniciar"
-        )
-        launch_button.command()
+        app._open_tool(youtube_tool)
         assert app.search_frame.winfo_manager() == ""
         assert any(isinstance(w, tk.Entry) for w in descendants(app.inner))
         assert app._active_tool == youtube_tool
         assert app._tool_url is not None
-        monkeypatch.setattr(hl, "download_youtube_video", lambda _url: Path("video.mp4"))
+        app._open_tool_settings()
+        assert app._settings_window is not None
+        settings_widgets = list(descendants(app._settings_window))
+        option_menus = [widget for widget in settings_widgets if isinstance(widget, tk.OptionMenu)]
+        assert len(option_menus) == 2
+        settings_entries = [widget for widget in settings_widgets if type(widget) is tk.Entry]
+        assert len(settings_entries) == 1
+        assert settings_entries[0].cget("state") == "readonly"
+        format_menu = app.nametowidget(option_menus[0]["menu"])
+        quality_menu = app.nametowidget(option_menus[1]["menu"])
+        format_menu.invoke(3)
+        assert option_menus[1].cget("state") == "disabled"
+        format_menu.invoke(0)
+        assert option_menus[1].cget("state") == "normal"
+        quality_menu.invoke(3)
+        save_settings_button = next(
+            widget for widget in settings_widgets
+            if isinstance(widget, hl.RoundedButton) and widget.text == "Guardar preferencias"
+        )
+        save_settings_button.command()
+        saved_settings = hl.fetch_youtube_downloader_settings()
+        assert saved_settings["output_format"] == "mp4"
+        assert saved_settings["quality"] == "1080"
+        assert "priority" not in saved_settings
+
+        release_download = threading.Event()
+        monkeypatch.setattr(hl, "fetch_youtube_downloader_settings", lambda: {"output_directory": str(Path.home() / "Downloads")})
+        monkeypatch.setattr(hl, "fetch_tasks", lambda: [])
+        monkeypatch.setattr(hl, "download_youtube_video", lambda _url, download_dir=None: (release_download.wait(2), Path("video.mp4"))[1])
         app._tool_url.set("https://youtu.be/example")
         app._download_tool()
         assert app._download_status_label is not None
         assert app._download_status_label.cget("fg") == "#22c55e"
+        assert app._download_progressbar is not None
+        assert app._download_progressbar.winfo_manager() == "pack"
+        app._results.put(("download_progress", ("youtube-dl", 0.42, "Descargando video · 2.40 MB/s")))
+        app._poll()
+        assert app._download_status.get() == "Descargando video · 2.40 MB/s"
+        assert float(app._download_progressbar["value"]) == 42
+        release_download.set()
+        _pump(app, 0.2)
         app._close_tool()
         assert app.search_frame.winfo_manager() == "pack"
     finally:

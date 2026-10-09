@@ -79,10 +79,74 @@ describe("detalle de plugin", () => {
     expect(await screen.findByRole("heading", { name: "YouTube Downloader" })).toBeInTheDocument();
     expect(screen.getByText("Formato del plugin")).toBeInTheDocument();
     const urlInput = screen.getByRole("textbox", { name: "URL de YouTube" });
-    const downloadButton = screen.getByRole("button", { name: /Descargar video/ });
+    const downloadButton = screen.getByRole("button", { name: "Descargar" });
     expect(downloadButton).toBeDisabled();
     await userEvent.type(urlInput, "https://youtu.be/example");
     expect(downloadButton).toBeEnabled();
+  });
+
+  it("guarda formato y calidad sin mostrar ajustes de carpeta o prioridad", async () => {
+    const fetchMock = mockApi({
+      ...baseRoutes(),
+      "/plugins/youtube-dl": { body: plugin({ id: "youtube-dl", name: "YouTube Downloader", enabled: true, admin_state: "enabled" }) },
+    });
+    renderApp("/tools/youtube-dl");
+    await screen.findByRole("heading", { name: "YouTube Downloader" });
+    await userEvent.click(screen.getByRole("button", { name: "Preferencias de descarga" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Preferencias de descarga" });
+    expect(within(dialog).queryByText("Carpeta de descarga")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Priorizar")).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(dialog).getByLabelText("Formato"), "wav");
+    expect(within(dialog).getByLabelText("Resolución máxima")).toBeDisabled();
+    await userEvent.selectOptions(within(dialog).getByLabelText("Formato"), "mp4");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Resolución máxima"), "1080");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/plugins/youtube-dl/config",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ output_directory: "C:/Users/test/Downloads", output_format: "mp4", quality: "1080" }),
+      }),
+    ));
+  });
+
+  it("muestra porcentaje y velocidad durante la descarga", async () => {
+    const pendingDownload = new Promise<Response>(() => {});
+    const routes: Record<string, { status?: number; body: unknown }> = {
+      ...baseRoutes(),
+      "/plugins/youtube-dl": { body: plugin({ id: "youtube-dl", name: "YouTube Downloader", enabled: true, admin_state: "enabled" }) },
+      "/tasks": {
+        body: {
+          items: [{
+            id: "task-download", plugin_id: "youtube-dl", operation: "download-video", status: "running",
+            progress: 0.42, message: "Descargando video · 2.40 MB/s", error: null, cancel_requested: false,
+            timeout_seconds: null, created_at: "2026-10-09T10:00:00Z", finished_at: null,
+          }],
+          total: 1, active_count: 1, limit: 50, offset: 0,
+        },
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input).replace("/api/v1", "");
+      if (path === "/plugins/youtube-dl/download") return pendingDownload;
+      const key = Object.keys(routes).find((route) => path === route || path.startsWith(route + "?"));
+      const response = key ? routes[key as keyof typeof routes] : undefined;
+      return Promise.resolve(new Response(JSON.stringify(response?.body ?? {}), { status: response?.status ?? 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderApp("/tools/youtube-dl");
+    await screen.findByRole("heading", { name: "YouTube Downloader" });
+    await userEvent.type(screen.getByRole("textbox", { name: "URL de YouTube" }), "https://youtu.be/example");
+    await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+    expect(await screen.findByRole("progressbar")).toHaveAttribute("aria-valuenow", "42");
+    expect(screen.getByText("Descargando video · 2.40 MB/s")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/plugins/youtube-dl/download",
+      expect.objectContaining({ body: JSON.stringify({ url: "https://youtu.be/example", save_to_output_directory: false }) }),
+    );
   });
 
   it("muestra permisos y pide confirmación al deshabilitar", async () => {

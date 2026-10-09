@@ -42,6 +42,12 @@ export interface StoredFile {
   mime_type: string | null; created_at: string; expires_at: string | null;
 }
 
+export interface YoutubeDownloaderSettings {
+  output_directory: string;
+  output_format: "mp4" | "webm" | "mov" | "mp3" | "wav";
+  quality: "best" | "2160" | "1440" | "1080" | "720" | "480";
+}
+
 export interface AppInfo {
   name: string; version: string; api_version: string; environment: string;
   untrusted_plugins_allowed: boolean; mode: string;

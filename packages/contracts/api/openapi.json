@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Hub API",
-    "version": "1.1"
+    "version": "1.2"
   },
   "paths": {
     "/api/v1/health": {
@@ -740,6 +740,68 @@
         }
       }
     },
+    "/api/v1/plugins/youtube-dl/config": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Get Youtube Downloader Settings",
+        "operationId": "get_youtube_downloader_settings_api_v1_plugins_youtube_dl_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Youtube Downloader Settings Api V1 Plugins Youtube Dl Config Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Put Youtube Downloader Settings",
+        "operationId": "put_youtube_downloader_settings_api_v1_plugins_youtube_dl_config_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YoutubeDownloaderSettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Put Youtube Downloader Settings Api V1 Plugins Youtube Dl Config Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/plugins/youtube-dl/download": {
       "post": {
         "tags": [
@@ -789,6 +851,11 @@
             "maxLength": 2048,
             "minLength": 1,
             "title": "Url"
+          },
+          "save_to_output_directory": {
+            "type": "boolean",
+            "title": "Save To Output Directory",
+            "default": true
           }
         },
         "type": "object",
@@ -873,6 +940,46 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "YoutubeDownloaderSettings": {
+        "properties": {
+          "output_directory": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Output Directory"
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "mp4",
+              "webm",
+              "mov",
+              "mp3",
+              "wav"
+            ],
+            "title": "Output Format",
+            "default": "mp4"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "best",
+              "2160",
+              "1440",
+              "1080",
+              "720",
+              "480"
+            ],
+            "title": "Quality",
+            "default": "best"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output_directory"
+        ],
+        "title": "YoutubeDownloaderSettings"
       }
     }
   }

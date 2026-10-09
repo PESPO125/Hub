@@ -52,7 +52,7 @@ carpeta → [scan: lee plugin.json, NO ejecuta nada]
 
 ## 7. API `/api/v1` (v1)
 `GET /health`, `/ready`, `/app/info`, `/plugins`, `/plugins/{id}`, `POST /plugins/refresh`, `PATCH /plugins/{id}/state`, `GET/PUT /plugins/{id}/config`, `GET /catalog`, `GET/POST? /tasks` (solo lectura + cancelar; crear tarea requiere plugin habilitado), `POST /tasks/{id}/cancel`, `GET /files`, `GET /files/{id}/download`, `GET/PUT /settings`, `GET /diagnostics`.
-Excepción específica: `POST /plugins/youtube-dl/download` es una integración mantenida por Hub; no ejecuta código arbitrario de la carpeta del plugin. El runner genérico para plugins todavía no existe.
+Excepción específica: `GET/PUT /plugins/youtube-dl/config` guarda preferencias del descargador y `POST /plugins/youtube-dl/download` ejecuta esa integración mantenida por Hub; cada descarga actualiza una tarea y registra su archivo. No ejecuta código arbitrario de la carpeta del plugin. El runner genérico para plugins todavía no existe.
 
 ## 8. Frontend
 Estructura por features (dashboard, catalog, plugin-details, tasks, files, settings). Layout con sidebar colapsable, topbar con buscador y contador de tareas activas, estados vacío/carga/error en todas las vistas, tema claro/oscuro/sistema. Favoritos se guardan en backend (`user_preferences`).

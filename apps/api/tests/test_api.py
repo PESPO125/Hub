@@ -56,7 +56,28 @@ def test_cancel_unknown_task(client):
     assert client.post("/api/v1/tasks/x/cancel").status_code == 404
 
 
-def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir, monkeypatch):
+def test_youtube_downloader_settings_validate_and_persist(client, tmp_path):
+    from pathlib import Path
+
+    endpoint = "/api/v1/plugins/youtube-dl/config"
+    defaults = client.get(endpoint).json()
+    assert defaults["output_format"] == "mp4"
+    assert defaults["quality"] == "best"
+    assert Path(defaults["output_directory"]).name == "downloads"
+
+    settings = {
+        "output_directory": str(tmp_path / "video exports"),
+        "output_format": "wav",
+        "quality": "1080",
+    }
+    response = client.put(endpoint, json=settings)
+    assert response.status_code == 200
+    assert client.get(endpoint).json() == settings
+    assert Path(settings["output_directory"]).is_dir()
+    assert client.put(endpoint, json={**settings, "output_format": "avi"}).status_code == 422
+
+
+def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir, monkeypatch, tmp_path):
     from pathlib import Path
 
     from app.api.v1.endpoints import youtube_dl
@@ -68,6 +89,12 @@ def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir
     assert client.post(endpoint, json={"url": "https://[invalid"}).status_code == 422
     assert client.post(endpoint, json={"url": "https://youtu.be/video"}).status_code == 409
     client.patch("/api/v1/plugins/youtube-dl/state", json={"enabled": True})
+    output_dir = tmp_path / "preferred-download-folder"
+    output_dir.mkdir()
+    (output_dir / "video123.mp4").write_bytes(b"previous video")
+    client.put("/api/v1/plugins/youtube-dl/config", json={
+        "output_directory": str(output_dir), "output_format": "mp4", "quality": "1080",
+    })
 
     def fake_youtube_dl(options):
         class FakeYoutubeDL:
@@ -79,7 +106,8 @@ def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir
 
             def extract_info(self, _url, download):
                 assert download is True
-                assert "format" not in options
+                assert options["format"] == "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[ext=mp4]"
+                assert options["postprocessors"] == [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}]
                 assert "max_downloads" not in options
                 assert Path(options["ffmpeg_location"]).is_file()
                 return {"id": "video123", "ext": "mp4"}
@@ -95,7 +123,7 @@ def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir
     response = client.post(endpoint, json={"url": "https://youtu.be/video"})
     assert response.status_code == 200
     assert response.content == b"video-data"
-    assert "video123.mp4" in response.headers["content-disposition"]
+    assert "video123%20%281%29.mp4" in response.headers["content-disposition"]
 
     task_page = client.get("/api/v1/tasks").json()
     assert task_page["total"] == 1
@@ -107,9 +135,65 @@ def test_youtube_download_validates_plugin_and_returns_video(client, plugins_dir
     assert file_page["total"] == 1
     stored_file = file_page["items"][0]
     assert stored_file["task_id"] == task_page["items"][0]["id"]
+    assert stored_file["display_name"] == "video123 (1).mp4"
     assert stored_file["size_bytes"] == len(b"video-data")
     stored_response = client.get(f"/api/v1/files/{stored_file['id']}/download")
     assert stored_response.content == b"video-data"
+    assert (output_dir / "video123 (1).mp4").read_bytes() == b"video-data"
+
+
+def test_youtube_download_applies_audio_format(client, plugins_dir, monkeypatch, tmp_path):
+    from pathlib import Path
+
+    from app.api.v1.endpoints import youtube_dl
+
+    write_plugin(plugins_dir, "youtube-dl", good("youtube-dl"))
+    client.post("/api/v1/plugins/refresh")
+    client.patch("/api/v1/plugins/youtube-dl/state", json={"enabled": True})
+    output_dir = tmp_path / "exported"
+    client.put("/api/v1/plugins/youtube-dl/config", json={
+        "output_directory": str(output_dir),
+        "output_format": "mp3",
+        "quality": "1080",
+    })
+
+    class AudioYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def extract_info(self, _url, download):
+            assert download is True
+            assert self.options["format"] == "bestaudio/best"
+            assert self.options["postprocessors"] == [{
+                "key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "320",
+            }]
+            self.options["progress_hooks"][0]({
+                "status": "downloading", "downloaded_bytes": 500_000, "total_bytes": 1_000_000,
+                "speed": 2_000_000,
+            })
+            running = client.get("/api/v1/tasks?status=running").json()["items"][0]
+            assert running["progress"] == 0.5
+            assert "2.00 MB/s" in running["message"]
+            audio_path = Path(self.options["outtmpl"].replace("%(id)s", "audio123").replace("%(ext)s", "mp3"))
+            audio_path.write_bytes(b"audio-data")
+            return {"id": "audio123", "ext": "mp3", "filepath": str(audio_path)}
+
+    monkeypatch.setattr(youtube_dl.yt_dlp, "YoutubeDL", AudioYoutubeDL)
+    response = client.post("/api/v1/plugins/youtube-dl/download", json={
+        "url": "https://youtu.be/audio",
+        "save_to_output_directory": False,
+    })
+    assert response.status_code == 200
+    assert "audio123.mp3" in response.headers["content-disposition"]
+    assert response.content == b"audio-data"
+    assert not (output_dir / "audio123.mp3").exists()
+    assert client.get("/api/v1/files").json()["total"] == 1
 
 
 def test_youtube_download_reports_sanitized_yt_dlp_error(client, plugins_dir, monkeypatch):
@@ -145,6 +229,36 @@ def test_youtube_download_reports_sanitized_yt_dlp_error(client, plugins_dir, mo
     assert client.get("/api/v1/files").json()["total"] == 0
 
 
+def test_youtube_download_reports_sanitized_unexpected_error(client, plugins_dir, monkeypatch):
+    from app.api.v1.endpoints import youtube_dl
+
+    write_plugin(plugins_dir, "youtube-dl", good("youtube-dl"))
+    client.post("/api/v1/plugins/refresh")
+    client.patch("/api/v1/plugins/youtube-dl/state", json={"enabled": True})
+
+    class BrokenYoutubeDL:
+        def __init__(self, _options):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def extract_info(self, url, download):
+            assert download is True
+            raise RuntimeError(f"conversion failed for {url}")
+
+    monkeypatch.setattr(youtube_dl.yt_dlp, "YoutubeDL", BrokenYoutubeDL)
+    url = "https://youtu.be/private-video"
+    response = client.post("/api/v1/plugins/youtube-dl/download", json={"url": url})
+    message = response.json()["error"]["message"]
+    assert response.status_code == 500
+    assert "RuntimeError: conversion failed" in message
+    assert url not in message
+
+
 def test_youtube_download_cancellation_stops_running_task(client, plugins_dir, monkeypatch):
     from app.api.v1.endpoints import youtube_dl
     from tempfile import TemporaryDirectory
@@ -172,6 +286,12 @@ def test_youtube_download_cancellation_stops_running_task(client, plugins_dir, m
         def extract_info(self, _url, download):
             assert download is True
             task = client.get("/api/v1/tasks").json()["items"][0]
+            second_download = client.post(
+                "/api/v1/plugins/youtube-dl/download",
+                json={"url": "https://youtu.be/second-video"},
+            )
+            assert second_download.status_code == 409
+            assert second_download.json()["error"]["code"] == "download_in_progress"
             cancel_response = client.post(f"/api/v1/tasks/{task['id']}/cancel")
             assert cancel_response.status_code == 200
             self.options["progress_hooks"][0](

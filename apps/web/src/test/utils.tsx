@@ -33,8 +33,9 @@ export const baseRoutes = (): Routes => ({
   "/tasks": { body: { items: [], total: 0, active_count: 0, limit: 50, offset: 0 } },
   "/files": { body: { items: [], total: 0, limit: 50, offset: 0 } },
   "/settings": { body: { theme: "system" } },
-  "/app/info": { body: { name: "Hub", version: "1.1", api_version: "v1", environment: "test", untrusted_plugins_allowed: false, mode: "single_user_local" } },
+  "/app/info": { body: { name: "Hub", version: "1.2", api_version: "v1", environment: "test", untrusted_plugins_allowed: false, mode: "single_user_local" } },
   "/plugins": { body: { items: [], total: 0, limit: 100, offset: 0 } },
+  "/plugins/youtube-dl/config": { body: { output_directory: "C:/Users/test/Downloads", output_format: "mp4", quality: "best" } },
 });
 
 export function renderApp(path = "/") {
