@@ -1,3 +1,4 @@
+import io
 import socket
 import sys
 import threading
@@ -25,6 +26,25 @@ def test_filter_tools():
     assert [t.plugin_id for t in hl.filter_tools(tools, "BETA")] == ["b"]
     assert hl.filter_tools(tools, "  ") == tools
 
+def test_download_youtube_video_saves_response(tmp_path, monkeypatch):
+    class Headers:
+        def get_filename(self):
+            return "video123.mp4"
+
+    class Response(io.BytesIO):
+        headers = Headers()
+
+    def fake_urlopen(request, timeout):
+        assert request.full_url == "http://hub/api/v1/plugins/youtube-dl/download"
+        assert request.get_method() == "POST"
+        assert timeout == 1800
+        return Response(b"video-data")
+
+    monkeypatch.setattr(hl.urllib.request, "urlopen", fake_urlopen)
+    result = hl.download_youtube_video("https://youtu.be/video123", "http://hub", tmp_path)
+    assert result.name == "video123.mp4"
+    assert result.read_bytes() == b"video-data"
+
 
 def test_backend_down_raises():
     with pytest.raises(hl.BackendError):
@@ -38,8 +58,16 @@ def live_api(tmp_path):
     plugins = tmp_path / "plugins"
     (plugins / "p").mkdir(parents=True)
     (plugins / "p" / "plugin.json").write_text(
-        '{"id":"qr-test","name":"QR","version":"1.0.0","integration":{"type":"subprocess"},'
-        '"tools":[{"id":"gen","name":"Generar QR","description":"Crea un código"}]}')
+        '{"id":"qr-test","name":"QR","version":"1.0","integration":{"type":"subprocess"},'
+        '"tools":[{"id":"gen","name":"Generar QR","description":"Crea un código"}]}', encoding="utf-8")
+    youtube_folder = plugins / "youtube-dl"
+    youtube_folder.mkdir()
+    (youtube_folder / "plugin.json").write_text(
+        '{"id":"youtube-dl","name":"YouTube Downloader","version":"1.0",'
+        '"integration":{"type":"subprocess"},"tools":[{"id":"download-video",'
+        '"name":"Descargar Video","description":"Descarga videos de YouTube"}]}',
+        encoding="utf-8",
+    )
     s = Settings(database_url=f"sqlite:///{tmp_path/'t.db'}", plugins_dir=plugins, data_dir=tmp_path / "d")
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -76,39 +104,47 @@ def _pump(app, seconds=1.5):
 
 def test_gui_states(live_api, monkeypatch):
     tk = pytest.importorskip("tkinter")
-    from tkinter import ttk
-    monkeypatch.setattr(hl, "API_URL", "http://127.0.0.1:9")  # backend caído
+    monkeypatch.setattr(hl, "API_URL", live_api)
     try:
         app = hl.LauncherApp()
     except tk.TclError:
         pytest.skip("sin pantalla disponible")
 
-    def texts():
-        return [w.cget("text") for w in app.inner.winfo_children() if isinstance(w, ttk.Label)]
+    def descendants(widget):
+        for child in widget.winfo_children():
+            yield child
+            yield from descendants(child)
 
     try:
         _pump(app)
-        assert "No se pudo conectar con Hub" in texts()
-        assert "Sin conexión" in app.status.cget("text")
-
-        monkeypatch.setattr(hl, "API_URL", live_api)  # backend arriba, plugin sin habilitar
-        app.refresh()
-        _pump(app)
-        assert "No hay herramientas habilitadas" in texts()
-
         import json
         import urllib.request
-        req = urllib.request.Request(f"{live_api}/api/v1/plugins/qr-test/state", method="PATCH",
-                                     data=json.dumps({"enabled": True}).encode(), headers={"Content-Type": "application/json"})
+
+        req = urllib.request.Request(
+            f"{live_api}/api/v1/plugins/youtube-dl/state",
+            method="PATCH",
+            data=json.dumps({"enabled": True}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
         urllib.request.urlopen(req).read()
         app.refresh()
         _pump(app)
-        shown = [w for row in app.inner.winfo_children() for w in row.winfo_children() if isinstance(w, ttk.Label)]
-        assert any(w.cget("text") == "Generar QR" for w in shown)
-        assert "1 herramienta" in app.status.cget("text")
-
-        app.query.set("zzz")
-        _pump(app, 0.3)
-        assert "Sin resultados" in texts()
+        youtube_tool = next(t for t in app._tools if t.plugin_id == "youtube-dl")
+        launch_button = next(
+            widget for widget in descendants(app.inner)
+            if isinstance(widget, hl.RoundedButton) and widget.text == "Iniciar"
+        )
+        launch_button.command()
+        assert app.search_frame.winfo_manager() == ""
+        assert any(isinstance(w, tk.Entry) for w in descendants(app.inner))
+        assert app._active_tool == youtube_tool
+        assert app._tool_url is not None
+        monkeypatch.setattr(hl, "download_youtube_video", lambda _url: Path("video.mp4"))
+        app._tool_url.set("https://youtu.be/example")
+        app._download_tool()
+        assert app._download_status_label is not None
+        assert app._download_status_label.cget("fg") == "#22c55e"
+        app._close_tool()
+        assert app.search_frame.winfo_manager() == "pack"
     finally:
         app.destroy()

@@ -1,5 +1,5 @@
-import { ArrowLeft, Info, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Download, Info, ShieldAlert } from "lucide-react";
+import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FavoriteButton } from "@/components/shared/plugin-card";
 import { PluginStatusBadge } from "@/components/shared/status-badges";
@@ -10,7 +10,7 @@ import { ErrorState, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { resolveIcon } from "@/lib/icons";
 import { ApiError } from "@/services/api";
-import { usePlugin, useSetPluginState } from "@/services/queries";
+import { useDownloadYoutubeVideo, usePlugin, useSetPluginState } from "@/services/queries";
 import type { Plugin } from "@/types/api";
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -23,6 +23,44 @@ const PERMISSION_LABELS: Record<string, string> = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <section className="rounded-lg border bg-card p-4 shadow-card"><h2 className="mb-3 text-sm font-semibold">{title}</h2>{children}</section>;
+}
+
+function YoutubeDownloader({ enabled }: { enabled: boolean }) {
+  const [url, setUrl] = useState("");
+  const download = useDownloadYoutubeVideo();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    download.mutate(url, { onSuccess: () => setUrl("") });
+  };
+
+  return (
+    <Section title="Descargar video">
+      <form onSubmit={submit} className="space-y-3">
+        <label htmlFor="youtube-url" className="block text-sm font-medium">URL de YouTube</label>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            id="youtube-url"
+            name="url"
+            type="url"
+            required
+            maxLength={2048}
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
+            className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <Button type="submit" loading={download.isPending} disabled={!enabled || !url.trim()}>
+            <Download className="h-4 w-4" aria-hidden />
+            Descargar video
+          </Button>
+        </div>
+      </form>
+      {!enabled && <p className="mt-3 text-sm text-muted-foreground">Habilita el plugin para poder descargar.</p>}
+      {download.isError && <p role="alert" className="mt-3 text-sm text-destructive">{download.error.message}</p>}
+      {download.isSuccess && <p role="status" className="mt-3 text-sm text-muted-foreground">La descarga comenzó en tu navegador.</p>}
+    </Section>
+  );
 }
 
 function Body({ plugin }: { plugin: Plugin }) {
@@ -72,7 +110,7 @@ function Body({ plugin }: { plugin: Plugin }) {
                 <li key={t.id} className="py-2 first:pt-0 last:pb-0"><p className="text-sm font-medium">{t.name}</p>{t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}</li>
               ))}</ul>
             )}
-            {usable && (
+            {usable && plugin.id !== "youtube-dl" && (
               <p className="mt-4 flex items-start gap-2 rounded-md bg-muted p-3 text-sm text-muted-foreground">
                 <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
                 {!plugin.enabled ? "Habilitá el plugin para poder usar sus herramientas."
@@ -80,6 +118,7 @@ function Body({ plugin }: { plugin: Plugin }) {
               </p>
             )}
           </Section>
+          {plugin.id === "youtube-dl" && <YoutubeDownloader enabled={plugin.enabled} />}
           <Section title="Permisos solicitados">
             {plugin.permissions.length === 0 ? <p className="text-sm text-muted-foreground">No solicita permisos.</p> : (
               <ul className="space-y-1 text-sm">{plugin.permissions.map((p) => <li key={p}>{PERMISSION_LABELS[p] ?? p} <code className="text-xs text-muted-foreground">({p})</code></li>)}</ul>
@@ -92,8 +131,8 @@ function Body({ plugin }: { plugin: Plugin }) {
             <dl className="space-y-2 text-sm">
               <Row k="Identificador" v={<code className="text-xs">{plugin.id}</code>} />
               <Row k="Integración" v={plugin.integration_type ?? "—"} />
-              <Row k="Contrato" v={plugin.contract_version ? `v${plugin.contract_version}` : "—"} />
-              <Row k="Plataforma" v={plugin.platform ? `≥ ${plugin.platform.min_version}${plugin.platform.max_version ? ` · ≤ ${plugin.platform.max_version}` : ""}` : "—"} />
+              <Row k="Formato del plugin" v={plugin.contract_version ? `v${plugin.contract_version}` : "—"} />
+              <Row k="Versión requerida" v={plugin.platform ? `${plugin.platform.min_version}${plugin.platform.max_version ? ` · ≤ ${plugin.platform.max_version}` : ""}` : "—"} />
               <Row k="Carpeta" v={<code className="text-xs">{plugin.folder}</code>} />
               <Row k="Categorías" v={plugin.categories.length ? <span className="flex flex-wrap justify-end gap-1">{plugin.categories.map((c) => <Badge key={c}>{c}</Badge>)}</span> : "—"} />
             </dl>

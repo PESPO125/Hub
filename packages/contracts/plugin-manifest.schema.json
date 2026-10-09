@@ -23,15 +23,15 @@
       "additionalProperties": false,
       "properties": {
         "min_version": {
-          "default": "0.1.0",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "default": "1.0",
+          "pattern": "^\\d+\\.\\d+$",
           "title": "Min Version",
           "type": "string"
         },
         "max_version": {
           "anyOf": [
             {
-              "pattern": "^\\d+\\.\\d+\\.\\d+$",
+              "pattern": "^\\d+\\.\\d+$",
               "type": "string"
             },
             {
@@ -94,7 +94,7 @@
       "type": "string"
     },
     "version": {
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "pattern": "^\\d+\\.\\d+$",
       "title": "Version",
       "type": "string"
     },

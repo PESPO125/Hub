@@ -8,14 +8,14 @@ Un plugin es una carpeta dentro de `plugins/` con un `plugin.json`. Hub **solo l
   "id": "ejemplo-herramienta",
   "name": "Ejemplo",
   "description": "Descripción breve.",
-  "version": "1.0.0",
+  "version": "1.0",
   "contract_version": 1,
   "categories": ["utilities"],
   "icon": "wrench",
   "integration": { "type": "subprocess" },
   "tools": [{ "id": "run", "name": "Ejecutar", "description": "Qué hace." }],
   "permissions": ["files.read", "files.write"],
-  "platform": { "min_version": "0.1.0" }
+  "platform": { "min_version": "1.0" }
 }
 ```
 
@@ -29,4 +29,4 @@ Un plugin es una carpeta dentro de `plugins/` con un `plugin.json`. Hub **solo l
 1. Copiar la carpeta a `plugins/`. 2. Configuración → Plugins → **Buscar plugins**. 3. Habilitarlo.
 
 ## Importante
-Habilitar un plugin **no lo ejecuta**: el runner todavía no existe, y la ejecución de plugins no confiables está deshabilitada (`HUB_ALLOW_UNTRUSTED_PLUGINS=false`). Los permisos son declarativos, no una barrera de seguridad.
+Habilitar un plugin **no ejecuta su código**: el runner genérico todavía no existe, y la ejecución de plugins no confiables está deshabilitada (`HUB_ALLOW_UNTRUSTED_PLUGINS=false`). YouTube Downloader es una integración específica mantenida por Hub: la implementación que descarga los videos está en `apps/api/app/api/v1/endpoints/youtube_dl.py` y se registra desde `apps/api/app/api/v1/router.py`; no ejecuta `main.py` desde la carpeta del plugin. Los permisos son declarativos, no una barrera de seguridad.

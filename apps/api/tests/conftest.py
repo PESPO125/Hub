@@ -29,6 +29,6 @@ def write_plugin(root: Path, folder: str, manifest: dict | str) -> None:
 
 
 def good(pid: str = "demo-tool", **over) -> dict:
-    m = {"id": pid, "name": "Demo", "version": "1.0.0", "integration": {"type": "subprocess"}, "categories": ["utilities"]}
+    m = {"id": pid, "name": "Demo", "version": "1.0", "integration": {"type": "subprocess"}, "categories": ["utilities"]}
     m.update(over)
     return m

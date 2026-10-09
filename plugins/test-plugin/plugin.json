@@ -1,7 +1,7 @@
 {
   "id": "test-plugin", 
   "name": "Plugin de Prueba",
-  "version": "1.0.0",
+  "version": "1.0",
   "integration": {
     "type": "remote_api"
   },

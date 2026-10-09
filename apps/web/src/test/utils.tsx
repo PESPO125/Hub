@@ -7,9 +7,9 @@ import { createTestRouter } from "@/app/router";
 export const emptyCatalog = { items: [], total: 0, categories: [], installed_total: 0 };
 
 export const plugin = (over: Record<string, unknown> = {}) => ({
-  id: "demo-tool", folder: "demo", name: "Demo Tool", description: "Una herramienta", version: "1.0.0", contract_version: 1,
+  id: "demo-tool", folder: "demo", name: "Demo Tool", description: "Una herramienta", version: "1.0", contract_version: 1,
   categories: ["utilities"], icon: "wrench", integration_type: "subprocess", tools: [{ id: "run", name: "Ejecutar", description: "" }],
-  capabilities: [], permissions: ["files.read"], config_requirements: [], platform: { min_version: "0.1.0", max_version: null },
+  capabilities: [], permissions: ["files.read"], config_requirements: [], platform: { min_version: "1.0", max_version: null },
   status: "available", admin_state: "disabled", enabled: false, executable: false, executable_reason: null, problems: [], favorite: false, ...over,
 });
 
@@ -33,7 +33,7 @@ export const baseRoutes = (): Routes => ({
   "/tasks": { body: { items: [], total: 0, active_count: 0, limit: 50, offset: 0 } },
   "/files": { body: { items: [], total: 0, limit: 50, offset: 0 } },
   "/settings": { body: { theme: "system" } },
-  "/app/info": { body: { name: "Hub", version: "0.1.0", api_version: "v1", environment: "test", untrusted_plugins_allowed: false, mode: "single_user_local" } },
+  "/app/info": { body: { name: "Hub", version: "1.1", api_version: "v1", environment: "test", untrusted_plugins_allowed: false, mode: "single_user_local" } },
   "/plugins": { body: { items: [], total: 0, limit: 100, offset: 0 } },
 });
 

@@ -9,13 +9,16 @@ from __future__ import annotations
 import json
 import os
 import queue
+import shutil
 import threading
 import tkinter as tk
 import urllib.error
 import urllib.request
 import webbrowser
 from dataclasses import dataclass
+from pathlib import Path
 from tkinter import ttk
+from tempfile import NamedTemporaryFile
 
 API_URL = os.environ.get("HUB_API_URL", "http://127.0.0.1:8000").rstrip("/")
 WEB_URL = os.environ.get("HUB_WEB_URL", "http://localhost:5173").rstrip("/")
@@ -40,6 +43,54 @@ def fetch_catalog(api_url: str | None = None, timeout: float = 2.5) -> dict:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             return json.load(res)
     except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError, OSError) as exc:
+        raise BackendError(str(exc)) from exc
+
+
+def download_youtube_video(
+    url: str,
+    api_url: str | None = None,
+    download_dir: Path | None = None,
+    timeout: float = 1800,
+) -> Path:
+    api_url = (api_url or API_URL).rstrip("/")
+    req = urllib.request.Request(
+        f"{api_url}/api/v1/plugins/youtube-dl/download",
+        data=json.dumps({"url": url}).encode("utf-8"),
+        headers={"Accept": "application/octet-stream", "Content-Type": "application/json"},
+        method="POST",
+    )
+    target_dir = download_dir or (Path.home() / "Downloads")
+    temporary_path: Path | None = None
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            filename = Path(response.headers.get_filename() or "youtube-video").name
+            if filename in {"", ".", ".."}:
+                filename = "youtube-video"
+            destination = target_dir / filename
+            suffix = destination.suffix
+            stem = destination.stem
+            index = 1
+            while destination.exists():
+                destination = target_dir / f"{stem} ({index}){suffix}"
+                index += 1
+            with NamedTemporaryFile(prefix=".hub-download-", dir=target_dir, delete=False) as output:
+                temporary_path = Path(output.name)
+                shutil.copyfileobj(response, output)
+        os.replace(temporary_path, destination)
+        return destination
+    except urllib.error.HTTPError as exc:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
+        try:
+            body = json.loads(exc.read().decode("utf-8"))
+            message = body.get("error", {}).get("message", f"El backend respondió {exc.code}.")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            message = f"El backend respondió {exc.code}."
+        raise BackendError(message) from exc
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+        if temporary_path and temporary_path.exists():
+            temporary_path.unlink()
         raise BackendError(str(exc)) from exc
 
 
@@ -110,7 +161,7 @@ class RoundedButton(tk.Canvas):
 class LauncherApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Hub // Control Center")
+        self.title("Hub  --  Cooking")
         self.geometry("580x740")
         self.minsize(480, 500)
         
@@ -126,6 +177,11 @@ class LauncherApp(tk.Tk):
         self.configure(bg=self.bg_color)
 
         self._tools: list[Tool] = []
+        self._active_tool: Tool | None = None
+        self._tool_url: tk.StringVar | None = None
+        self._download_status: tk.StringVar | None = None
+        self._download_status_label: tk.Label | None = None
+        self._downloading = False
         self._connected = False
         self._results: queue.Queue = queue.Queue()
         
@@ -153,14 +209,14 @@ class LauncherApp(tk.Tk):
         self.status.pack(side="right", pady=8)
 
         # Barra de búsqueda
-        search_frame = tk.Frame(self, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1, bd=0)
-        search_frame.pack(fill="x", pady=(0, 24), **pad)
+        self.search_frame = tk.Frame(self, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1, bd=0)
+        self.search_frame.pack(fill="x", pady=(0, 24), **pad)
         
         self.query = tk.StringVar()
         self.query.trace_add("write", lambda *_: self._render())
         
         search_entry = tk.Entry(
-            search_frame, 
+            self.search_frame, 
             textvariable=self.query, 
             bg=self.card_bg, 
             fg=self.text_main, 
@@ -190,7 +246,7 @@ class LauncherApp(tk.Tk):
         
         RoundedButton(
             foot, 
-            text="Actualizar", 
+            text="Refresh", 
             command=self.refresh,
             bg="#21262d",
             hover_bg="#30363d",
@@ -244,6 +300,9 @@ class LauncherApp(tk.Tk):
             ).pack(anchor="w")
 
     def _render(self) -> None:
+        if self._active_tool is not None:
+            self._render_tool(self._active_tool)
+            return
         if not self._connected:
             self._message(
                 "Sin conexión con el Hub",
@@ -289,12 +348,10 @@ class LauncherApp(tk.Tk):
             btn_frame = tk.Frame(card, bg=self.card_bg)
             btn_frame.pack(fill="x", pady=(4, 0))
             
-            tool_url = f"{WEB_URL}/plugins/{t.plugin_id}/tools/{t.tool_id}"
-            
             RoundedButton(
                 btn_frame, 
-                text="Lanzar herramienta ↗", 
-                command=lambda u=tool_url: webbrowser.open(u),
+                text="Iniciar", 
+                command=lambda selected=t: self._open_tool(selected),
                 bg="#21262d",
                 hover_bg=self.accent_color,
                 fg=self.text_main,
@@ -314,6 +371,105 @@ class LauncherApp(tk.Tk):
             top_row.bind("<Enter>", on_enter)
             top_row.bind("<Leave>", on_leave)
 
+    def _open_tool(self, tool: Tool) -> None:
+        self._active_tool = tool
+        self.search_frame.pack_forget()
+        self._render_tool(tool)
+
+    def _close_tool(self) -> None:
+        self._active_tool = None
+        self.search_frame.pack(fill="x", before=self.body, pady=(0, 24), padx=28)
+        self._render()
+
+    def _render_tool(self, tool: Tool) -> None:
+        self._clear()
+        panel = tk.Frame(self.inner, bg=self.card_bg, highlightbackground=self.border_color, highlightthickness=1)
+        panel.pack(fill="x", pady=12, ipadx=22, ipady=22)
+
+        RoundedButton(
+            panel,
+            text="← Volver a herramientas",
+            command=self._close_tool,
+            bg="#21262d",
+            hover_bg="#30363d",
+            fg=self.text_main,
+            radius=6,
+            padx=12,
+            pady=6,
+            canvas_bg=self.card_bg,
+        ).pack(anchor="w", pady=(0, 22))
+
+        tk.Label(panel, text=tool.name, font=("Segoe UI", 16, "bold"), bg=self.card_bg, fg=self.text_main).pack(anchor="w")
+        tk.Label(panel, text=tool.plugin_name, font=("Segoe UI", 9), bg=self.card_bg, fg=self.text_muted).pack(anchor="w", pady=(4, 18))
+
+        if tool.plugin_id == "youtube-dl" and tool.tool_id == "download-video":
+            tk.Label(panel, text="URL de YouTube", font=("Segoe UI", 10, "bold"), bg=self.card_bg, fg=self.text_main).pack(anchor="w", pady=(0, 8))
+            self._tool_url = tk.StringVar()
+            entry = tk.Entry(
+                panel,
+                textvariable=self._tool_url,
+                bg="#0f1117",
+                fg=self.text_main,
+                insertbackground=self.text_main,
+                relief="flat",
+                font=("Segoe UI", 11),
+            )
+            entry.pack(fill="x", ipady=10, ipadx=12)
+            entry.bind("<Return>", lambda _event: self._download_tool())
+
+            RoundedButton(
+                panel,
+                text="Descargar video",
+                command=self._download_tool,
+                bg=self.accent_color,
+                hover_bg=self.accent_hover,
+                fg="#ffffff",
+                radius=6,
+                padx=16,
+                pady=9,
+                canvas_bg=self.card_bg,
+            ).pack(anchor="e", pady=(14, 0))
+            self._download_status = tk.StringVar()
+            self._download_status_label = tk.Label(
+                panel,
+                textvariable=self._download_status,
+                font=("Segoe UI", 9),
+                bg=self.card_bg,
+                fg=self.text_muted,
+                wraplength=440,
+                justify="left",
+            )
+            self._download_status_label.pack(anchor="w", pady=(12, 0))
+            entry.focus_set()
+        else:
+            detail = tool.description or "Esta herramienta todavía no tiene una interfaz nativa en Hub."
+            tk.Label(panel, text=detail, font=("Segoe UI", 10), bg=self.card_bg, fg=self.text_muted, wraplength=440, justify="left").pack(anchor="w")
+
+    def _download_tool(self) -> None:
+        if self._downloading or self._tool_url is None or self._download_status is None:
+            return
+        url = self._tool_url.get().strip()
+        if not url:
+            self._download_status.set("Ingresa una URL de YouTube.")
+            return
+        tool = self._active_tool
+        if tool is None:
+            return
+
+        self._downloading = True
+        self._download_status.set("Descargando video…")
+        if self._download_status_label is not None:
+            self._download_status_label.config(fg="#22c55e")
+
+        def work() -> None:
+            try:
+                path = download_youtube_video(url)
+                self._results.put(("download_ok", (tool.plugin_id, path)))
+            except BackendError as exc:
+                self._results.put(("download_error", (tool.plugin_id, str(exc))))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def refresh(self) -> None:
         self.status.config(text="Actualizando…")
         def work() -> None:
@@ -329,11 +485,24 @@ class LauncherApp(tk.Tk):
         except queue.Empty:
             pass
         else:
-            self._connected = kind == "ok"
-            self._tools = payload if kind == "ok" else []
-            n = len(self._tools)
-            self.status.config(text=f"● {n} {'herramienta' if n == 1 else 'herramientas'}" if self._connected else "● Sin conexión")
-            self._render()
+            if kind in ("ok", "error"):
+                self._connected = kind == "ok"
+                self._tools = payload if kind == "ok" else []
+                n = len(self._tools)
+                self.status.config(text=f"● {n} {'herramienta' if n == 1 else 'herramientas'}" if self._connected else "● Sin conexión")
+                self._render()
+            else:
+                self._downloading = False
+                tool_id, result = payload
+                if self._active_tool and self._active_tool.plugin_id == tool_id and self._download_status is not None:
+                    if kind == "download_ok":
+                        self._download_status.set(f"Video guardado en: {result}")
+                        if self._download_status_label is not None:
+                            self._download_status_label.config(fg="#22c55e")
+                    else:
+                        self._download_status.set(result)
+                        if self._download_status_label is not None:
+                            self._download_status_label.config(fg="#f85149")
         self.after(100, self._poll)
 
 

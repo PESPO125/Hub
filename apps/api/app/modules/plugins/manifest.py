@@ -26,8 +26,8 @@ class Integration(BaseModel):
 
 class PlatformCompat(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    min_version: str = Field(default="0.1.0", pattern=r"^\d+\.\d+\.\d+$")
-    max_version: str | None = Field(default=None, pattern=r"^\d+\.\d+\.\d+$")
+    min_version: str = Field(default="1.0", pattern=r"^\d+\.\d+$")
+    max_version: str | None = Field(default=None, pattern=r"^\d+\.\d+$")
 
 
 class PluginManifest(BaseModel):
@@ -35,7 +35,7 @@ class PluginManifest(BaseModel):
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{2,47}$")
     name: str = Field(min_length=1, max_length=60)
     description: str = Field(default="", max_length=400)
-    version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
+    version: str = Field(pattern=r"^\d+\.\d+$")
     contract_version: int = 1
     categories: list[Category] = Field(default_factory=list, max_length=4)
     icon: IconName = "puzzle"

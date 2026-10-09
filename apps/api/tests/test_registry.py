@@ -14,7 +14,7 @@ def test_valid_invalid_incompatible(plugins_dir):
     write_plugin(plugins_dir, "badjson", "{oops")
     write_plugin(plugins_dir, "extra", good("extra-tool", entry="evil.js"))  # campos desconocidos prohibidos
     write_plugin(plugins_dir, "badicon", good("icon-tool", icon="../../etc/passwd"))
-    write_plugin(plugins_dir, "future", good("future-tool", platform={"min_version": "9.0.0"}))
+    write_plugin(plugins_dir, "future", good("future-tool", platform={"min_version": "9.0"}))
     (plugins_dir / "empty").mkdir()
     r = by_folder(scan_directory(plugins_dir))
     assert r["ok"].status == "available"

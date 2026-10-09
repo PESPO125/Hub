@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/services/api";
+import { api, downloadYoutubeVideo } from "@/services/api";
 import type { AppInfo, Catalog, Diagnostics, Page, Plugin, StoredFile, TaskPage, TaskStatus, Theme } from "@/types/api";
 
 export const keys = {
@@ -65,6 +65,9 @@ export const useSetPluginState = () => {
     onSuccess: invalidate,
   });
 };
+
+export const useDownloadYoutubeVideo = () =>
+  useMutation({ mutationFn: (url: string) => downloadYoutubeVideo(url) });
 
 export const useRefreshPlugins = () => {
   const invalidate = useInvalidate();

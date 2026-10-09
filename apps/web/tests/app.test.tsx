@@ -70,6 +70,21 @@ describe("catálogo con datos reales del backend", () => {
 });
 
 describe("detalle de plugin", () => {
+  it("muestra el formulario de descarga en YouTube Downloader", async () => {
+    mockApi({
+      ...baseRoutes(),
+      "/plugins/youtube-dl": { body: plugin({ id: "youtube-dl", name: "YouTube Downloader", enabled: true, admin_state: "enabled" }) },
+    });
+    renderApp("/tools/youtube-dl");
+    expect(await screen.findByRole("heading", { name: "YouTube Downloader" })).toBeInTheDocument();
+    expect(screen.getByText("Formato del plugin")).toBeInTheDocument();
+    const urlInput = screen.getByRole("textbox", { name: "URL de YouTube" });
+    const downloadButton = screen.getByRole("button", { name: /Descargar video/ });
+    expect(downloadButton).toBeDisabled();
+    await userEvent.type(urlInput, "https://youtu.be/example");
+    expect(downloadButton).toBeEnabled();
+  });
+
   it("muestra permisos y pide confirmación al deshabilitar", async () => {
     const fetchMock = mockApi({
       ...baseRoutes(),
