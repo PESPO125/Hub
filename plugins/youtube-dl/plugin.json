@@ -1,0 +1,15 @@
+{
+  "id": "youtube-dl",
+  "name": "YouTube Downloader",
+  "version": "1.0.0",
+  "integration": {
+    "type": "subprocess"
+  },
+  "tools": [
+    {
+      "id": "download-video",
+      "name": "Descargar Video",
+      "description": "Descarga videos o audios de YouTube pegando el enlace."
+    }
+  ]
+}

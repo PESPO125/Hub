@@ -12,3 +12,6 @@
 - **Control de acceso**: no hay `ADMIN_TOKEN`; la API asume uso local en 127.0.0.1. No exponer a la red.
 - **Tipos TS**: escritos a mano (`apps/web/src/types/api.ts`); falta tipar las respuestas con `response_model` y generarlos desde OpenAPI.
 - Docker/Compose, instalación/actualización/desinstalación de plugins, pruebas de accesibilidad automatizadas, pruebas visuales en navegador real.
+
+## Lanzador (apps/launcher)
+`hub_launcher.py`: ventana Tkinter (solo librería estándar) que lista las herramientas de plugins habilitados desde `/api/v1/catalog`, con búsqueda, estados de "sin conexión" y "sin herramientas", y atajo al panel web. **Todavía no ejecuta herramientas**: falta el runner (ver Pendiente). Ejecutar: `python apps/launcher/hub_launcher.py`.

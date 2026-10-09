@@ -1,0 +1,15 @@
+{
+  "id": "test-plugin", 
+  "name": "Plugin de Prueba",
+  "version": "1.0.0",
+  "integration": {
+    "type": "remote_api"
+  },
+  "tools": [
+    {
+      "id": "demo-tool",
+      "name": "Herramienta Demo",
+      "description": "Una herramienta visual de prueba para verificar el funcionamiento."
+    }
+  ]
+}
