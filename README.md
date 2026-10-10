@@ -1,6 +1,10 @@
 # Hub
 =======
 
+
+
+<div align="center">
+
 <!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
 <a href="#readme">
   <img src="https://github.com/PESPO125/Hub/raw/readme/.github/banner.png" alt="Banner del proyecto">
@@ -16,7 +20,7 @@
 [![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
 
 <!-- Insignia de actividad de commits -->
-[![Commits](https://github.com/PESPO125/Hub/activity?label=commits&style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+[![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
 </div>
 
