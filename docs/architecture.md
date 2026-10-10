@@ -3,7 +3,7 @@
 ## 1. Alcance de la v1
 Núcleo + API + registro de plugins + tareas + archivos + configuración + UI. Incluye YouTube como plugin core de ejemplo.
 Modelo de uso: **un único usuario local** (sin cuentas). El esquema reserva `owner_id` nullable en tareas/archivos/preferencias para añadir auth después sin migraciones destructivas.
-La API escucha por defecto solo en `127.0.0.1`; las rutas de administración exigen un token local (`ADMIN_TOKEN` en `.env`) para no exponerse si se cambia el bind.
+La API escucha por defecto solo en `127.0.0.1` y no incluye autenticación: está pensada para uso local y no debe exponerse a la red.
 
 ## 2. Decisiones técnicas
 | Tema | Decisión | Motivo |

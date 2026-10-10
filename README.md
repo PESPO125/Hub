@@ -23,7 +23,7 @@
 [![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
 
 <!-- Insignia de actividad de commits -->
-[![Commits](https://github.com/PESPO125/Hub/activity?label=commits&style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+[![Commits](https://img.shields.io/github/commit-activity/m/PESPO125/Hub?label=commits&style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
 </div>
 
@@ -34,6 +34,15 @@ Plataforma de herramientas independientes (microapps) con sistema de plugins. In
 - Etapa 1 (arquitectura): `docs/architecture.md`.
 - Interfaz gráfica inicial + API de lectura/administración + registro de plugins: implementados y probados.
 - Pendiente: ver `docs/status.md`.
+
+## Aviso legal y de uso
+
+Hub es un proyecto personal, pensado para **uso local y personal**. Se ofrece "tal cual", sin garantías de ningún tipo.
+
+- El plugin de YouTube usa [yt-dlp](https://github.com/yt-dlp/yt-dlp). Descargar contenido de YouTube puede incumplir sus Términos del Servicio o las leyes de derechos de autor de tu país. **Eres el único responsable del uso que le des**: descarga solo contenido propio, de dominio público o para el que tengas permiso.
+- Los autores no se hacen responsables del mal uso de esta herramienta ni de los daños que pueda causar.
+- La API no tiene autenticación y escucha solo en `127.0.0.1`. **No la expongas a internet ni a tu red local.**
+- Los plugins de terceros se ejecutan con los permisos de tu usuario. Instala solo plugins en los que confíes.
 
 ## Requisitos
 Python ≥ 3.11 y Node ≥ 20.
