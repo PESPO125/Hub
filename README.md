@@ -10,7 +10,7 @@
 
 <!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
 <a href="#readme">
-  <img src="https://raw.githubusercontent.com/PESPO125/Hub/refs/heads/master/.github/banner.svg" alt="Banner del proyecto">
+  <img src="https://github.com/PESPO125/Hub/raw/readme/.github/banner.svg" alt="Banner del proyecto">
 </a>
 
 <!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
