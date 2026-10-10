@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatDate } from "@/lib/utils";
+import { DownloadFileLink } from "@/features/files/download-file-link";
 import { useCancelTask, useTasks } from "@/services/queries";
 import type { Task, TaskStatus } from "@/types/api";
 
@@ -46,6 +47,15 @@ export function TasksPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{t.operation} <span className="font-normal text-muted-foreground">· {t.plugin_id}</span></p>
                   <p className="truncate text-xs text-muted-foreground">{t.message ?? t.error?.message ?? formatDate(t.created_at)}</p>
+                  {(t.files ?? []).length > 0 && (
+                    <ul aria-label="Archivos de resultado" className="mt-2 flex flex-wrap gap-2">
+                      {t.files.map((file) => (
+                        <li key={file.id}>
+                          <DownloadFileLink fileId={file.id} fileName={file.display_name} className="h-8 px-2 text-xs" />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {t.status === "running" && t.progress !== null && (
                     <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(t.progress * 100)} className="mt-2 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-muted">
                       <div className="h-full bg-primary transition-all" style={{ width: `${Math.round(t.progress * 100)}%` }} />

@@ -27,18 +27,21 @@ def test_filter_tools():
     assert hl.filter_tools(tools, "  ") == tools
 
 def test_download_youtube_video_saves_response(tmp_path, monkeypatch):
-    class Headers:
-        def get_filename(self):
-            return "video123.mp4"
-
-    class Response(io.BytesIO):
-        headers = Headers()
+    responses = [
+        io.BytesIO(b'{"id":"task-1","status":"pending"}'),
+        io.BytesIO(b'{"items":[{"id":"task-1","status":"completed"}]}'),
+        io.BytesIO(b'{"items":[{"id":"file-1","task_id":"task-1","display_name":"video123.mp4"}]}'),
+        io.BytesIO(b"video-data"),
+    ]
 
     def fake_urlopen(request, timeout):
-        assert request.full_url == "http://hub/api/v1/plugins/youtube-dl/download"
-        assert request.get_method() == "POST"
-        assert timeout == 1800
-        return Response(b"video-data")
+        assert timeout in (1800, 5)
+        if request.full_url == "http://hub/api/v1/tasks":
+            assert request.get_method() == "POST"
+            body = request.data.decode()
+            assert '"plugin_id": "youtube-dl"' in body
+            assert '"tool_id": "download-video"' in body
+        return responses.pop(0)
 
     monkeypatch.setattr(hl.urllib.request, "urlopen", fake_urlopen)
     result = hl.download_youtube_video("https://youtu.be/video123", "http://hub", tmp_path)
@@ -104,7 +107,6 @@ def _pump(app, seconds=1.5):
 
 def test_gui_states(live_api, monkeypatch):
     tk = pytest.importorskip("tkinter")
-    from tkinter import ttk
 
     monkeypatch.setattr(hl, "API_URL", live_api)
     try:
@@ -148,9 +150,9 @@ def test_gui_states(live_api, monkeypatch):
         format_menu = app.nametowidget(option_menus[0]["menu"])
         quality_menu = app.nametowidget(option_menus[1]["menu"])
         format_menu.invoke(3)
-        assert option_menus[1].cget("state") == "disabled"
+        assert app._settings_window.quality_caption.get() == "Calidad de audio"
         format_menu.invoke(0)
-        assert option_menus[1].cget("state") == "normal"
+        assert app._settings_window.quality_caption.get() == "Resolución máxima"
         quality_menu.invoke(3)
         save_settings_button = next(
             widget for widget in settings_widgets
@@ -165,19 +167,24 @@ def test_gui_states(live_api, monkeypatch):
         release_download = threading.Event()
         monkeypatch.setattr(hl, "fetch_youtube_downloader_settings", lambda: {"output_directory": str(Path.home() / "Downloads")})
         monkeypatch.setattr(hl, "fetch_tasks", lambda: [])
-        monkeypatch.setattr(hl, "download_youtube_video", lambda _url, download_dir=None: (release_download.wait(2), Path("video.mp4"))[1])
+        monkeypatch.setattr(hl, "download_youtube_video", lambda _url, download_dir=None, **_kwargs: (release_download.wait(2), Path("video.mp4"))[1])
         app._tool_url.set("https://youtu.be/example")
         app._download_tool()
+        _pump(app, 0.1)
         assert app._download_status_label is not None
-        assert app._download_status_label.cget("fg") == "#22c55e"
+        assert app._download_status_label.cget("fg") == hl.GOLD
         assert app._download_progressbar is not None
         assert app._download_progressbar.winfo_manager() == "pack"
-        app._results.put(("download_progress", ("youtube-dl", 0.42, "Descargando video · 2.40 MB/s")))
+        app._results.put(("download_task_update", ("youtube-dl", {
+            "id": "task-1", "status": "running", "progress": 0.42,
+            "message": "Descargando video · 2.40 MB/s",
+        })))
         app._poll()
         assert app._download_status.get() == "Descargando video · 2.40 MB/s"
         assert float(app._download_progressbar["value"]) == 42
         release_download.set()
-        _pump(app, 0.2)
+        _pump(app, 1.0)
+        assert app._download_status.get() == "Video guardado en: video.mp4"
         app._close_tool()
         assert app.search_frame.winfo_manager() == "pack"
     finally:

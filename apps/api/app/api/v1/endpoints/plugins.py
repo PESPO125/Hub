@@ -1,4 +1,5 @@
-from typing import Literal
+import json
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -73,6 +74,33 @@ def set_state(
 ) -> dict:
     service.set_admin_state(db, registry, plugin_id, body.enabled)
     return get_plugin(plugin_id, db, registry, s)
+
+
+@router.get("/plugins/{plugin_id}/config")
+def get_plugin_config(plugin_id: str, db: Session = Depends(get_db), registry: PluginRegistry = Depends(get_registry)) -> dict:
+    if registry.get(plugin_id) is None:
+        raise AppError(404, "plugin_not_found", "Plugin no encontrado.")
+    preference = db.get(Preference, f"{plugin_id}-config")
+    return preference.value if preference and isinstance(preference.value, dict) else {}
+
+
+@router.put("/plugins/{plugin_id}/config")
+def put_plugin_config(
+    plugin_id: str,
+    body: dict[str, Any],
+    db: Session = Depends(get_db),
+    registry: PluginRegistry = Depends(get_registry),
+) -> dict:
+    if registry.get(plugin_id) is None:
+        raise AppError(404, "plugin_not_found", "Plugin no encontrado.")
+    try:
+        if len(json.dumps(body, ensure_ascii=False).encode("utf-8")) > 64 * 1024:
+            raise ValueError("too large")
+    except (TypeError, ValueError):
+        raise AppError(422, "invalid_plugin_config", "La configuración supera el tamaño permitido o no es válida.") from None
+    db.merge(Preference(key=f"{plugin_id}-config", value=body))
+    db.commit()
+    return body
 
 
 @router.put("/favorites/{plugin_id}")

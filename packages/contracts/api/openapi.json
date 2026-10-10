@@ -291,6 +291,101 @@
         }
       }
     },
+    "/api/v1/plugins/{plugin_id}/config": {
+      "get": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Get Plugin Config",
+        "operationId": "get_plugin_config_api_v1_plugins__plugin_id__config_get",
+        "parameters": [
+          {
+            "name": "plugin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Plugin Config Api V1 Plugins  Plugin Id  Config Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "plugins"
+        ],
+        "summary": "Put Plugin Config",
+        "operationId": "put_plugin_config_api_v1_plugins__plugin_id__config_put",
+        "parameters": [
+          {
+            "name": "plugin_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Plugin Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Put Plugin Config Api V1 Plugins  Plugin Id  Config Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/favorites/{plugin_id}": {
       "put": {
         "tags": [
@@ -533,6 +628,47 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "tasks",
+          "files"
+        ],
+        "summary": "Create Task",
+        "operationId": "create_task_api_v1_tasks_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Create Task Api V1 Tasks Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/tasks/{task_id}/cancel": {
@@ -739,130 +875,36 @@
           }
         }
       }
-    },
-    "/api/v1/plugins/youtube-dl/config": {
-      "get": {
-        "tags": [
-          "plugins"
-        ],
-        "summary": "Get Youtube Downloader Settings",
-        "operationId": "get_youtube_downloader_settings_api_v1_plugins_youtube_dl_config_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Get Youtube Downloader Settings Api V1 Plugins Youtube Dl Config Get"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "plugins"
-        ],
-        "summary": "Put Youtube Downloader Settings",
-        "operationId": "put_youtube_downloader_settings_api_v1_plugins_youtube_dl_config_put",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/YoutubeDownloaderSettings"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Put Youtube Downloader Settings Api V1 Plugins Youtube Dl Config Put"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/plugins/youtube-dl/download": {
-      "post": {
-        "tags": [
-          "plugins"
-        ],
-        "summary": "Download Youtube Video",
-        "operationId": "download_youtube_video_api_v1_plugins_youtube_dl_download_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DownloadBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
     "schemas": {
-      "DownloadBody": {
+      "CreateTaskBody": {
         "properties": {
-          "url": {
+          "plugin_id": {
             "type": "string",
-            "maxLength": 2048,
+            "maxLength": 64,
             "minLength": 1,
-            "title": "Url"
+            "title": "Plugin Id"
           },
-          "save_to_output_directory": {
-            "type": "boolean",
-            "title": "Save To Output Directory",
-            "default": true
+          "tool_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Tool Id"
+          },
+          "params": {
+            "type": "object",
+            "title": "Params"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "url"
+          "plugin_id",
+          "tool_id"
         ],
-        "title": "DownloadBody"
+        "title": "CreateTaskBody"
       },
       "HTTPValidationError": {
         "properties": {
@@ -940,50 +982,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "YoutubeDownloaderSettings": {
-        "properties": {
-          "output_directory": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 1,
-            "title": "Output Directory"
-          },
-          "output_format": {
-            "type": "string",
-            "enum": [
-              "mp4",
-              "webm",
-              "mov",
-              "mp3",
-              "wav"
-            ],
-            "title": "Output Format",
-            "default": "mp4"
-          },
-          "quality": {
-            "type": "string",
-            "enum": [
-              "best",
-              "320",
-              "256",
-              "192",
-              "128",
-              "2160",
-              "1440",
-              "1080",
-              "720",
-              "480"
-            ],
-            "title": "Quality",
-            "default": "best"
-          }
-        },
-        "type": "object",
-        "required": [
-          "output_directory"
-        ],
-        "title": "YoutubeDownloaderSettings"
       }
     }
   }

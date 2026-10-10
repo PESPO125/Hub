@@ -13,7 +13,10 @@ export interface Plugin {
   categories: string[];
   icon: string;
   integration_type: "python_inprocess" | "subprocess" | "remote_api" | null;
-  tools: { id: string; name: string; description: string }[];
+  tools: {
+    id: string; name: string; description: string;
+    params_schema?: Record<string, unknown>; max_concurrency?: number; timeout_seconds?: number;
+  }[];
   capabilities: string[];
   permissions: string[];
   config_requirements: string[];
@@ -34,6 +37,7 @@ export interface Task {
   id: string; plugin_id: string; operation: string; status: TaskStatus; progress: number | null;
   message: string | null; error: { code?: string; message?: string } | null; cancel_requested: boolean;
   timeout_seconds: number | null; created_at: string; finished_at: string | null;
+  files: StoredFile[];
 }
 export interface TaskPage extends Page<Task> { active_count: number }
 

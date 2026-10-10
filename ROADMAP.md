@@ -16,6 +16,8 @@
 
 * \[x\] Cuando se selecciona un formato de audio se pueda elegir la calidad de audio en vez de la resolución
 
+* \[x\] Agregar archivo de configuración
+
 ## 🛠️ Fix
 
 * \[x\] Descargar videos en .mov, .mp3 y .wav

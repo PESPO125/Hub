@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.errors import AppError
 from app.db.session import AuditEvent, PluginRecord, Preference
+from app.modules.plugins.trust import is_core_plugin
 from app.modules.plugins.registry import DiscoveredPlugin, PluginRegistry
 
 
@@ -22,12 +23,12 @@ def admin_states(db: Session) -> dict[str, str]:
 def to_view(p: DiscoveredPlugin, states: dict[str, str], favorites: list[str], settings: Settings) -> dict:
     admin = states.get(p.id, "disabled")
     enabled = admin == "enabled" and p.status == "available"
-    if not enabled:
+    core = is_core_plugin(p.id, settings.plugins_dir / p.folder, settings)
+    executable = enabled and (settings.allow_untrusted_plugins or core)
+    if not enabled or executable:
         reason = None
-    elif not settings.allow_untrusted_plugins:
-        reason = "La ejecución de plugins no confiables está deshabilitada en esta instalación."
     else:
-        reason = None
+        reason = "La ejecución de plugins no confiables está deshabilitada en esta instalación."
     m = p.manifest
     return {
         "id": p.id,
@@ -47,7 +48,7 @@ def to_view(p: DiscoveredPlugin, states: dict[str, str], favorites: list[str], s
         "status": p.status,
         "admin_state": admin,
         "enabled": enabled,
-        "executable": enabled and settings.allow_untrusted_plugins,
+        "executable": executable,
         "executable_reason": reason,
         "problems": p.problems,
         "favorite": p.id in favorites,

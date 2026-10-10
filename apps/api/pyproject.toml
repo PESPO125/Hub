@@ -8,6 +8,7 @@ dependencies = [
   "pydantic==2.10.4",
   "pydantic-settings==2.7.0",
   "sqlalchemy==2.0.36",
+  "truststore>=0.10,<1.0",
   "yt-dlp>=2025.3.31",
   "imageio-ffmpeg>=0.6.0",
 ]

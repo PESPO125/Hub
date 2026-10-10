@@ -45,20 +45,11 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   return (await res.json()) as T;
 }
 
-export async function downloadYoutubeVideo(url: string): Promise<void> {
-  const res = await request("/plugins/youtube-dl/download", {
+export async function submitTask(pluginId: string, toolId: string, params: Record<string, unknown>): Promise<{ id: string; status: string }> {
+  const res = await request("/tasks", {
     method: "POST",
-    headers: { Accept: "application/octet-stream", "Content-Type": "application/json" },
-    body: JSON.stringify({ url, save_to_output_directory: false }),
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ plugin_id: pluginId, tool_id: toolId, params }),
   });
-
-  const filename = res.headers.get("content-disposition")?.match(/filename="?([^";]+)"?/i)?.[1] ?? "video-youtube";
-  const objectUrl = URL.createObjectURL(await res.blob());
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  return (await res.json()) as { id: string; status: string };
 }

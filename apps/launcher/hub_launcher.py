@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 import os
 import queue
-import shutil
 import threading
+import time
 import tkinter as tk
 import urllib.error
 import urllib.request
@@ -55,6 +55,10 @@ class BackendError(Exception):
     """El backend no responde o devolvió algo inesperado."""
 
 
+class TaskCancelled(BackendError):
+    """La tarea fue cancelada desde la interfaz."""
+
+
 # --------------------------------------------------------------------------- cliente HTTP
 
 _NETWORK_ERRORS = (urllib.error.URLError, TimeoutError, ConnectionError, OSError)
@@ -90,15 +94,19 @@ def fetch_catalog(api_url: str | None = None, timeout: float = 2.5) -> dict:
 
 
 def fetch_youtube_downloader_settings() -> dict:
-    return _api_request(f"plugins/{YOUTUBE_PLUGIN_ID}/config")
+    values = _api_request(f"plugins/{YOUTUBE_PLUGIN_ID}/config")
+    values.setdefault("output_directory", str(Path.home() / "Downloads"))
+    values.setdefault("output_format", "mp4")
+    values.setdefault("quality", "best")
+    return values
 
 
 def save_youtube_downloader_settings(settings: dict) -> dict:
     return _api_request(f"plugins/{YOUTUBE_PLUGIN_ID}/config", "PUT", settings)
 
 
-def fetch_tasks(limit: int = 20) -> list[dict]:
-    return _api_request(f"tasks?limit={limit}").get("items", [])
+def fetch_tasks(limit: int = 20, api_url: str | None = None) -> list[dict]:
+    return _api_request(f"tasks?limit={limit}", api_url=api_url).get("items", [])
 
 
 def _unique_destination(directory: Path, name: str) -> Path:
@@ -111,32 +119,61 @@ def _unique_destination(directory: Path, name: str) -> Path:
 
 
 def download_youtube_video(url: str, api_url: str | None = None, download_dir: Path | None = None,
-                           timeout: float = DOWNLOAD_TIMEOUT) -> Path:
+                           timeout: float = DOWNLOAD_TIMEOUT,
+                           on_task_update: Callable[[dict], None] | None = None,
+                           cancel_event: threading.Event | None = None) -> Path:
     base = (api_url or API_URL).rstrip("/")
-    request = urllib.request.Request(
-        f"{base}/api/v1/plugins/{YOUTUBE_PLUGIN_ID}/download",
-        data=json.dumps({"url": url, "save_to_output_directory": True}).encode("utf-8"),
-        headers={"Accept": "application/octet-stream", "Content-Type": "application/json"},
-        method="POST",
-    )
     target_dir = download_dir or (Path.home() / "Downloads")
     temporary_path: Path | None = None
     try:
         target_dir.mkdir(parents=True, exist_ok=True)
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            filename = Path(response.headers.get_filename() or "youtube-video").name
-            if filename in {"", ".", ".."}:
-                filename = "youtube-video"
-            destination = target_dir / filename
-            if destination.is_file():
-                # El backend ya guardó el archivo en esta carpeta con nombre único: no se duplica.
-                while response.read(1024 * 1024):
-                    pass
-                return destination
-            destination = _unique_destination(target_dir, filename)
+        created_task = _api_request("tasks", "POST", {
+            "plugin_id": YOUTUBE_PLUGIN_ID,
+            "tool_id": YOUTUBE_TOOL_ID,
+            "params": {"url": url},
+        }, timeout=timeout, api_url=api_url)
+        task_id = created_task["id"]
+        if on_task_update:
+            on_task_update(created_task)
+        deadline = time.monotonic() + timeout
+        task = None
+        cancel_sent = False
+        while time.monotonic() < deadline:
+            task = next((t for t in fetch_tasks(50, api_url) if t.get("id") == task_id), None)
+            if task and on_task_update:
+                on_task_update(task)
+            if cancel_event and cancel_event.is_set() and not cancel_sent:
+                if not task or task.get("status") in {"pending", "running"}:
+                    try:
+                        _api_request(f"tasks/{task_id}/cancel", "POST", api_url=api_url)
+                    except BackendError:
+                        if not task or task.get("status") not in {"completed", "failed", "cancelled"}:
+                            raise
+                cancel_sent = True
+            if task and task.get("status") in {"completed", "failed", "cancelled"}:
+                break
+            time.sleep(0.5)
+        if cancel_event and cancel_event.is_set():
+            raise TaskCancelled("Tarea cancelada.")
+        if not task or task.get("status") != "completed":
+            message = (task or {}).get("error", {}).get("message") or "La descarga no se completó antes del límite de tiempo."
+            raise BackendError(message)
+        files = _api_request("files?limit=200", api_url=api_url).get("items", [])
+        stored_file = next((item for item in files if item.get("task_id") == task_id), None)
+        if stored_file is None:
+            raise BackendError("La tarea terminó, pero no registró un archivo de salida.")
+        filename = Path(stored_file.get("display_name") or "youtube-video").name
+        destination = _unique_destination(target_dir, filename)
+        download_request = urllib.request.Request(f"{base}/api/v1/files/{stored_file['id']}/download")
+        with urllib.request.urlopen(download_request, timeout=timeout) as response:
             with NamedTemporaryFile(prefix=".hub-download-", dir=target_dir, delete=False) as output:
                 temporary_path = Path(output.name)
-                shutil.copyfileobj(response, output)
+                while chunk := response.read(1024 * 1024):
+                    if cancel_event and cancel_event.is_set():
+                        raise TaskCancelled("Descarga cancelada.")
+                    output.write(chunk)
+        if cancel_event and cancel_event.is_set():
+            raise TaskCancelled("Descarga cancelada.")
         os.replace(temporary_path, destination)
         return destination
     except urllib.error.HTTPError as exc:
@@ -353,6 +390,11 @@ class LauncherApp(tk.Tk):
         self._download_status: tk.StringVar | None = None
         self._download_status_label: tk.Label | None = None
         self._download_progressbar: ttk.Progressbar | None = None
+        self._cancel_button: RoundedButton | None = None
+        self._cancel_event: threading.Event | None = None
+        self._current_task_id: str | None = None
+        self._task_status: str | None = None
+        self._cancel_requested = False
         self._download_config: dict | None = None
         self._settings_window: DownloadSettingsDialog | None = None
         self._downloading = False
@@ -514,8 +556,12 @@ class LauncherApp(tk.Tk):
                                     relief="flat", font=(FONT, 11))
         self._tool_entry.pack(fill="x", ipady=12, ipadx=14, pady=(0, 16))
         self._tool_entry.bind("<Return>", lambda _e: self._download_tool())
-        RoundedButton(panel, text="Descargar", command=self._download_tool, bg=ACCENT, hover_bg=ACCENT_HOVER,
-                      fg=BG, padx=20).pack(anchor="e")
+        actions = tk.Frame(panel, bg=BG)
+        actions.pack(fill="x")
+        RoundedButton(actions, text="Descargar", command=self._download_tool, bg=ACCENT, hover_bg=ACCENT_HOVER,
+                      fg=BG, padx=20).pack(side="right")
+        self._cancel_button = RoundedButton(actions, text="Cancelar tarea", command=self._cancel_download,
+                                            bg=ERROR, hover_bg="#ef4444", fg=BG, padx=16)
 
         self._download_progressbar = ttk.Progressbar(panel, mode="determinate", maximum=100,
                                                      style="Download.Horizontal.TProgressbar")
@@ -554,18 +600,6 @@ class LauncherApp(tk.Tk):
 
     # ---- descarga
 
-    def _watch_download_progress(self, plugin_id: str, stop: threading.Event) -> None:
-        while not stop.wait(0.75):
-            try:
-                task = next((row for row in fetch_tasks()
-                             if row["plugin_id"] == YOUTUBE_PLUGIN_ID and row["operation"] == YOUTUBE_TOOL_ID
-                             and row["status"] == "running"), None)
-            except BackendError:
-                continue
-            if task is not None:
-                self._results.put(("download_progress",
-                                   (plugin_id, task.get("progress"), task.get("message") or "Descargando video…")))
-
     def _download_tool(self) -> None:
         if self._downloading or self._tool_url is None or self._download_status is None or self._active_tool is None:
             return
@@ -576,27 +610,42 @@ class LauncherApp(tk.Tk):
         tool = self._active_tool
 
         self._downloading = True
+        self._cancel_event = threading.Event()
+        self._current_task_id = None
+        self._task_status = None
+        self._cancel_requested = False
         is_audio = bool(self._download_config and self._download_config.get("output_format") in AUDIO_FORMATS)
         if self._download_progressbar is not None:
-            self._download_progressbar.configure(value=0)
+            self._download_progressbar.configure(value=0, mode="indeterminate")
             self._download_progressbar.pack(fill="x", pady=(16, 0), before=self._download_status_label)
-        self._set_download_status("Descargando audio…" if is_audio else "Descargando video…")
+            self._download_progressbar.start(12)
+        self._set_download_status("En espera: enviando la tarea a Hub…", GOLD)
 
         def work() -> None:
-            stop_watcher = threading.Event()
-            watcher = threading.Thread(target=self._watch_download_progress, args=(tool.plugin_id, stop_watcher), daemon=True)
-            watcher.start()
             try:
                 config = fetch_youtube_downloader_settings()
-                path = download_youtube_video(url, download_dir=Path(config["output_directory"]))
+                path = download_youtube_video(
+                    url,
+                    download_dir=Path(config["output_directory"]),
+                    on_task_update=lambda task: self._results.put(("download_task_update", (tool.plugin_id, task))),
+                    cancel_event=self._cancel_event,
+                )
                 self._results.put(("download_ok", (tool.plugin_id, path, config.get("output_format") in AUDIO_FORMATS)))
+            except TaskCancelled:
+                self._results.put(("download_cancelled", tool.plugin_id))
             except BackendError as exc:
                 self._results.put(("download_error", (tool.plugin_id, str(exc), False)))
-            finally:
-                stop_watcher.set()
-                watcher.join(timeout=2)
 
         threading.Thread(target=work, daemon=True).start()
+
+    def _cancel_download(self) -> None:
+        if not self._downloading or self._cancel_event is None or self._cancel_requested:
+            return
+        self._cancel_requested = True
+        self._cancel_event.set()
+        if self._cancel_button is not None:
+            self._cancel_button.pack_forget()
+        self._set_download_status("Cancelando tarea…", GOLD)
 
     # ---- ciclo de eventos
 
@@ -619,10 +668,15 @@ class LauncherApp(tk.Tk):
         else:
             if kind in ("ok", "error"):
                 self._on_catalog(kind == "ok", payload)
-            elif kind == "download_progress":
-                self._on_download_progress(*payload)
+            elif kind == "download_task_update":
+                self._on_download_task_update(*payload)
+            elif kind == "download_cancelled":
+                self._downloading = False
+                self._on_download_cancelled(payload)
             else:
                 self._downloading = False
+                self._cancel_event = None
+                self._current_task_id = None
                 self._on_download_finished(kind == "download_ok", *payload)
         self.after(100, self._poll)
 
@@ -636,16 +690,52 @@ class LauncherApp(tk.Tk):
     def _is_showing(self, plugin_id: str) -> bool:
         return bool(self._active_tool and self._active_tool.plugin_id == plugin_id and self._download_status is not None)
 
-    def _on_download_progress(self, plugin_id: str, progress: float | None, message: str) -> None:
+    def _on_download_task_update(self, plugin_id: str, task: dict) -> None:
         if not self._is_showing(plugin_id):
             return
-        self._set_download_status(message)
-        if self._download_progressbar is not None and self._download_progressbar.winfo_manager() == "pack":
-            self._download_progressbar.configure(value=(progress or 0) * 100)
+        self._current_task_id = task.get("id", self._current_task_id)
+        status = task.get("status")
+        message = task.get("message") or "Ejecutando descarga…"
+        if status == "pending":
+            self._set_download_status(f"En espera: {message}", GOLD)
+            if self._download_progressbar is not None and self._task_status != "pending":
+                self._download_progressbar.configure(mode="indeterminate")
+                self._download_progressbar.start(12)
+        elif status == "running":
+            self._set_download_status(message)
+            if self._download_progressbar is not None:
+                if self._task_status != "running":
+                    self._download_progressbar.stop()
+                self._download_progressbar.configure(mode="determinate", value=(task.get("progress") or 0) * 100)
+        elif status == "completed":
+            self._set_download_status("Descarga completada. Guardando el archivo en tu carpeta…")
+        self._task_status = status
+        if status in {"pending", "running", "completed"} and not self._cancel_requested and self._cancel_button is not None:
+            if self._cancel_button.winfo_manager() != "pack":
+                self._cancel_button.pack(side="left")
+        elif self._cancel_button is not None:
+            self._cancel_button.pack_forget()
+
+    def _on_download_cancelled(self, plugin_id: str) -> None:
+        if not self._is_showing(plugin_id):
+            return
+        self._cancel_event = None
+        self._current_task_id = None
+        self._set_download_status("Tarea y descarga canceladas.", GOLD)
+        if self._download_progressbar is not None:
+            self._download_progressbar.stop()
+            self._download_progressbar.pack_forget()
+        if self._cancel_button is not None:
+            self._cancel_button.pack_forget()
 
     def _on_download_finished(self, ok: bool, plugin_id: str, result, is_audio: bool) -> None:
         if not self._is_showing(plugin_id):
             return
+        if self._download_progressbar is not None:
+            self._download_progressbar.stop()
+            self._download_progressbar.configure(mode="determinate")
+        if self._cancel_button is not None:
+            self._cancel_button.pack_forget()
         if ok:
             self._set_download_status(f"{'Audio' if is_audio else 'Video'} guardado en: {result}")
             if self._download_progressbar is not None:

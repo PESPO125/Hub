@@ -11,6 +11,20 @@
           ],
           "title": "Type",
           "type": "string"
+        },
+        "entrypoint": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint"
         }
       },
       "required": [
@@ -64,6 +78,24 @@
           "maxLength": 300,
           "title": "Description",
           "type": "string"
+        },
+        "params_schema": {
+          "title": "Params Schema",
+          "type": "object"
+        },
+        "max_concurrency": {
+          "default": 1,
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Max Concurrency",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
         }
       },
       "required": [

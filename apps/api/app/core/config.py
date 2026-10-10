@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import tomllib
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Raíz del repositorio: las rutas relativas se anclan acá, no al directorio desde el que se arranca el proceso.
@@ -20,7 +20,7 @@ API_VERSION = "v1"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="HUB_",
-        env_file=".env",
+        env_file=REPO_ROOT / ".env",
         toml_file=HUB_CONFIG_FILE,
         extra="ignore",
     )
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     allow_untrusted_plugins: bool = False
     cors_origins: str = "http://localhost:5173"
+    task_workers: int = Field(default=4, ge=1, le=32)
 
     @field_validator("plugins_dir", "data_dir")
     @classmethod

@@ -1,8 +1,8 @@
-import { Download, FileArchive } from "lucide-react";
+import { FileArchive } from "lucide-react";
 import { EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui/states";
-import { buttonClass } from "@/components/ui/button-link";
 import { formatBytes, formatDate } from "@/lib/utils";
 import { useFiles } from "@/services/queries";
+import { DownloadFileLink } from "./download-file-link";
 
 export function FilesPage() {
   const { data, isPending, isError, error, refetch } = useFiles();
@@ -20,15 +20,7 @@ export function FilesPage() {
                 <div className="min-w-0"><p className="truncate text-sm font-medium">{f.display_name}</p><p className="text-xs text-muted-foreground">{formatDate(f.created_at)}{f.expires_at && ` · expira ${formatDate(f.expires_at)}`}</p></div>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs text-muted-foreground">{formatBytes(f.size_bytes)}</span>
-                  <a
-                    href={`/api/v1/files/${encodeURIComponent(f.id)}/download`}
-                    download
-                    aria-label={`Descargar ${f.display_name}`}
-                    className={buttonClass("outline", "px-3")}
-                  >
-                    <Download className="h-4 w-4" aria-hidden />
-                    Descargar
-                  </a>
+                  <DownloadFileLink fileId={f.id} fileName={f.display_name} className="px-3" />
                 </div>
               </li>
             ))}

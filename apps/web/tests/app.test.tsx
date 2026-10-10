@@ -131,7 +131,7 @@ describe("detalle de plugin", () => {
     };
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = String(input).replace("/api/v1", "");
-      if (path === "/plugins/youtube-dl/download") return pendingDownload;
+      if (path === "/tasks") return pendingDownload;
       const key = Object.keys(routes).find((route) => path === route || path.startsWith(route + "?"));
       const response = key ? routes[key as keyof typeof routes] : undefined;
       return Promise.resolve(new Response(JSON.stringify(response?.body ?? {}), { status: response?.status ?? 200 }));
@@ -145,8 +145,8 @@ describe("detalle de plugin", () => {
     expect(await screen.findByRole("progressbar")).toHaveAttribute("aria-valuenow", "42");
     expect(screen.getByText("Descargando video · 2.40 MB/s")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/plugins/youtube-dl/download",
-      expect.objectContaining({ body: JSON.stringify({ url: "https://youtu.be/example", save_to_output_directory: false }) }),
+      "/api/v1/tasks",
+      expect.objectContaining({ body: JSON.stringify({ plugin_id: "youtube-dl", tool_id: "download-video", params: { url: "https://youtu.be/example" } }) }),
     );
   });
 

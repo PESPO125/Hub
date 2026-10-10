@@ -1,13 +1,14 @@
-import { Download, Settings2 } from "lucide-react";
+import { Download, Settings2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Section } from "@/components/shared/section";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/states";
 import { useToast } from "@/components/ui/toast";
+import { DownloadFileLink } from "@/features/files/download-file-link";
 import { useModalDialog } from "@/hooks/use-modal-dialog";
 import { isAudioFormat, normalizeQuality, qualityOptionsFor } from "@/lib/youtube";
-import { useDownloadYoutubeVideo, useSaveYoutubeDownloaderSettings, useTasks, useYoutubeDownloaderSettings } from "@/services/queries";
-import type { YoutubeDownloaderSettings } from "@/types/api";
+import { useCancelTask, useDownloadYoutubeVideo, useSaveYoutubeDownloaderSettings, useTasks, useYoutubeDownloaderSettings } from "@/services/queries";
+import type { TaskStatus, YoutubeDownloaderSettings } from "@/types/api";
 
 type Format = YoutubeDownloaderSettings["output_format"];
 type Quality = YoutubeDownloaderSettings["quality"];
@@ -79,13 +80,24 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
-function DownloadProgress({ message, progress }: { message: string; progress: number | null | undefined }) {
+function DownloadProgress({ status, message, progress, onCancel, canceling }: {
+  status: Extract<TaskStatus, "pending" | "running">;
+  message: string;
+  progress: number | null | undefined;
+  onCancel: () => void;
+  canceling: boolean;
+}) {
   const percent = Math.round((progress ?? 0) * 100);
   return (
     <div className="mt-3 space-y-1.5" aria-live="polite">
-      <div className="flex justify-between gap-3 text-xs text-success">
-        <span>{message}</span>
-        {progress !== null && progress !== undefined && <span>{percent}%</span>}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-success">
+        <span><strong>{status === "pending" ? "En espera" : "En ejecución"}:</strong> {message}</span>
+        <div className="flex items-center gap-2">
+          {status === "running" && progress !== null && progress !== undefined && <span>{percent}%</span>}
+          <Button variant="outline" size="sm" disabled={canceling} onClick={onCancel} aria-label="Cancelar descarga">
+            <X className="h-3.5 w-3.5" aria-hidden />{canceling ? "Cancelando…" : "Cancelar"}
+          </Button>
+        </div>
       </div>
       <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div className="h-full bg-success transition-all" style={{ width: `${percent}%` }} />
@@ -98,13 +110,24 @@ export function YoutubeDownloader({ enabled }: { enabled: boolean }) {
   const [url, setUrl] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const download = useDownloadYoutubeVideo();
+  const cancelTask = useCancelTask();
+  const toast = useToast();
   const { data: settings } = useYoutubeDownloaderSettings();
   const { data: tasks } = useTasks(undefined, 50, download.isPending);
-  const activeTask = tasks?.items.find((t) => t.plugin_id === "youtube-dl" && t.operation === "download-video" && t.status === "running");
+  const submittedTask = tasks?.items.find((t) => t.id === download.data?.id);
+  const activeTask = submittedTask ?? tasks?.items.find((t) => t.plugin_id === "youtube-dl" && t.operation === "download-video" && (t.status === "running" || t.status === "pending"));
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     download.mutate(url, { onSuccess: () => setUrl("") });
+  };
+
+  const cancelActiveTask = () => {
+    if (!activeTask) return;
+    cancelTask.mutate(activeTask.id, {
+      onSuccess: () => toast.success("Cancelación solicitada."),
+      onError: (error) => toast.error(error),
+    });
   };
 
   return (
@@ -121,17 +144,27 @@ export function YoutubeDownloader({ enabled }: { enabled: boolean }) {
               onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
               className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             <Button type="submit" loading={download.isPending} disabled={!enabled || !url.trim()}>
-              <Download className="h-4 w-4" aria-hidden />Descargar
+              <Download className="h-4 w-4" aria-hidden />load
             </Button>
           </div>
         </form>
         {!enabled && <p className="mt-3 text-sm text-muted-foreground">Habilita el plugin para poder descargar.</p>}
-        {download.isPending && <DownloadProgress message={activeTask?.message ?? "Preparando descarga…"} progress={activeTask?.progress} />}
+        {activeTask && (activeTask.status === "running" || activeTask.status === "pending") && (
+          <DownloadProgress status={activeTask.status} message={activeTask.message ?? "Preparando descarga…"}
+            progress={activeTask.progress} onCancel={cancelActiveTask}
+            canceling={cancelTask.isPending || activeTask.cancel_requested} />
+        )}
         {download.isError && <p role="alert" className="mt-3 text-sm text-destructive">{download.error.message}</p>}
-        {download.isSuccess && (
-          <p role="status" className="mt-3 text-sm text-success">
-            {isAudioFormat(settings?.output_format) ? "Audio descargado y guardado." : "Video descargado y guardado."}
-          </p>
+        {submittedTask?.status === "failed" && <p role="alert" className="mt-3 text-sm text-destructive">{submittedTask.error?.message ?? "La tarea falló."}</p>}
+        {submittedTask?.status === "completed" && (
+          <div role="status" className="mt-3 space-y-2 text-sm text-success">
+            <p>{isAudioFormat(settings?.output_format) ? "Audio listo para guardar en tu equipo:" : "Video listo para guardar en tu equipo:"}</p>
+            <div className="flex flex-wrap gap-2">
+              {(submittedTask.files ?? []).map((file) => (
+                <DownloadFileLink key={file.id} fileId={file.id} fileName={file.display_name} className="px-3" label="download" />
+              ))}
+            </div>
+          </div>
         )}
       </Section>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />

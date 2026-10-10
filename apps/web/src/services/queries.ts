@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, downloadYoutubeVideo } from "@/services/api";
+import { api, submitTask } from "@/services/api";
 import type { AppInfo, Catalog, Diagnostics, Page, Plugin, StoredFile, TaskPage, TaskStatus, Theme, YoutubeDownloaderSettings } from "@/types/api";
 
 export const keys = {
@@ -46,7 +46,14 @@ export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: ()
 export const useYoutubeDownloaderSettings = () =>
   useQuery({
     queryKey: keys.youtubeDownloaderSettings,
-    queryFn: () => api<YoutubeDownloaderSettings>("/plugins/youtube-dl/config"),
+    queryFn: async (): Promise<YoutubeDownloaderSettings> => {
+      const config = await api<Partial<YoutubeDownloaderSettings>>("/plugins/youtube-dl/config");
+      return {
+        output_directory: config.output_directory ?? "",
+        output_format: config.output_format ?? "mp4",
+        quality: config.quality ?? "best",
+      };
+    },
   });
 
 export const useSaveYoutubeDownloaderSettings = () => {
@@ -81,8 +88,13 @@ export const useSetPluginState = () => {
   });
 };
 
-export const useDownloadYoutubeVideo = () =>
-  useMutation({ mutationFn: (url: string) => downloadYoutubeVideo(url) });
+export const useDownloadYoutubeVideo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (url: string) => submitTask("youtube-dl", "download-video", { url }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+};
 
 export const useRefreshPlugins = () => {
   const invalidate = useInvalidate();

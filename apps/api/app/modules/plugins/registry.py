@@ -71,6 +71,21 @@ def scan_directory(plugins_dir: Path) -> list[DiscoveredPlugin]:
                 probs = [f"{'.'.join(str(x) for x in e['loc'])}: {e['msg']}" for e in exc.errors()]
                 found.append(DiscoveredPlugin(entry.name, "invalid", manifest_hash=digest, problems=probs))
                 continue
+            if manifest.integration.entrypoint:
+                plugin_root = entry.resolve()
+                candidate = Path(manifest.integration.entrypoint)
+                if candidate.is_absolute():
+                    found.append(DiscoveredPlugin(entry.name, "invalid", manifest, digest,
+                                                  ["El entrypoint debe ser una ruta relativa."]))
+                    continue
+                try:
+                    resolved = (plugin_root / candidate).resolve(strict=True)
+                    if not resolved.is_relative_to(plugin_root) or not resolved.is_file():
+                        raise OSError("outside plugin folder")
+                except OSError:
+                    found.append(DiscoveredPlugin(entry.name, "invalid", manifest, digest,
+                                                  ["El entrypoint no existe o apunta fuera del plugin."]))
+                    continue
             found.append(_check_compat(entry.name, manifest, digest))
         except Exception as exc:  # un plugin roto jamás tumba el escaneo
             found.append(DiscoveredPlugin(entry.name, "invalid", problems=[f"Error al leer el plugin: {type(exc).__name__}"]))
