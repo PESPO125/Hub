@@ -1,5 +1,7 @@
 from functools import lru_cache
+import os
 from pathlib import Path
+import tomllib
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,12 +9,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Raíz del repositorio: las rutas relativas se anclan acá, no al directorio desde el que se arranca el proceso.
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
-PLATFORM_VERSION = "1.3"
+HUB_CONFIG_FILE = REPO_ROOT / "hub.toml"
+with HUB_CONFIG_FILE.open("rb") as config_file:
+    _HUB_CONFIG = tomllib.load(config_file)
+
+PLATFORM_VERSION = os.environ.get("HUB_VERSION", str(_HUB_CONFIG.get("version", "1.3")))
 API_VERSION = "v1"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="HUB_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="HUB_",
+        env_file=".env",
+        toml_file=HUB_CONFIG_FILE,
+        extra="ignore",
+    )
 
     env: str = "development"
     database_url: str = ""

@@ -1,0 +1,12 @@
+# Configuración central de Hub.
+# Las variables de entorno HUB_* tienen prioridad sobre estos valores.
+
+version = "1.3"
+
+# API y almacenamiento
+env = "development"
+database_url = ""
+plugins_dir = "plugins"
+data_dir = "data"
+allow_untrusted_plugins = false
+cors_origins = "http://localhost:5173"
