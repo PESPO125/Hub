@@ -1,7 +1,7 @@
 <div align="center">
 
 # Hub
-[![HUB]([https://github.com/PESPO125/Hub/blob/main/.github/banner.png])](#readme)
+[![HUB]([https://github.com/PESPO125/Hub/blob/main/.github/banner.svg])](#readme)
 
 </div>
 
