@@ -1,26 +1,8 @@
-# Hub
-=======
-
-
-
 <div align="center">
 
-<!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
-<a href="#readme">
-  <img src="https://github.com/PESPO125/Hub/raw/readme/.github/banner.png" alt="Banner del proyecto">
-</a>
+[![Banner del proyecto](https://raw.githubusercontent.com/PESPO125/Hub/master/.github/banner.png)](#readme)
 
-<!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
-[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
-
-<!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
-[![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version")
-
-<!-- Insignia de Licencia -->
-[![License: Unlicense](https://img.shields.io/badge/-license-green.svg?style=for-the-badge)](LICENSE "License")
-
-<!-- Insignia de actividad de commits -->
-[![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-license-green.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
 </div>
 
