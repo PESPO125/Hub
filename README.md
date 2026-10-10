@@ -5,6 +5,35 @@
 
 </div>
 
+
+<div align="center">
+
+<!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
+<a href="#readme">
+  <img src="https://raw.githubusercontent.com/TU-USUARIO/TU-REPOSITORIO/master/.github/banner.svg" alt="Banner del proyecto">
+</a>
+
+<!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
+[![Release version](https://img.shields.io/github/v/release/TU-USUARIO/TU-REPOSITORIO?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
+
+<!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
+[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/TU-USUARIO/TU-REPOSITORIO/blob/master/pyproject.toml "Python Version")
+
+<!-- Insignia de PyPI (si subiste tu paquete a PyPI, cambia "yt-dlp" por el nombre de tu paquete) -->
+[![PyPI](https://img.shields.io/badge/-PyPI-blue.svg?logo=pypi&labelColor=555555&style=for-the-badge)](https://pypi.org/project/TU-PAQUETE-PYPI "PyPI")
+
+<!-- Insignia de Discord (reemplaza el enlace por el de tu invitación de Discord) -->
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?&logo=discord&logoColor=white&style=for-the-badge)](https://discord.gg/TU-INVITACION-DISCORD "Discord")
+
+<!-- Insignia de Licencia -->
+[![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
+
+<!-- Insignia de actividad de commits -->
+[![Commits](https://img.shields.io/github/commit-activity/m/TU-USUARIO/TU-REPOSITORIO?label=commits&style=for-the-badge)](https://github.com/TU-USUARIO/TU-REPOSITORIO/commits "Commit History")
+
+</div>
+
+
 Plataforma de herramientas independientes (microapps) con sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
 
 ## Estado
