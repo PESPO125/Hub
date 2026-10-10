@@ -1,6 +1,6 @@
 <div align="center">
 
-[![Banner del proyecto](https://raw.githubusercontent.com/PESPO125/Hub/master/.github/banner.png)](#readme)
+[![Banner del proyecto](https://github.com/PESPO125/Hub/raw/readme/.github/banner.png)](#readme)
 
 [![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-license-green.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
