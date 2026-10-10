@@ -14,10 +14,10 @@
 [![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
 
 <!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
-[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version")
+[![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version")
 
 <!-- Insignia de Licencia -->
-[![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
+[![License: Unlicense](https://img.shields.io/badge/-license-green.svg?style=for-the-badge)](LICENSE "License")
 
 <!-- Insignia de actividad de commits -->
 [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
