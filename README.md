@@ -1,4 +1,9 @@
+<div align="center">
+
 # Hub
+[![HUB](https://raw.githubusercontent.com/PESPO125/Hub/tree/main/.github/banner.png)](#readme)
+
+</div>
 
 Plataforma de herramientas independientes (microapps) con sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
 
