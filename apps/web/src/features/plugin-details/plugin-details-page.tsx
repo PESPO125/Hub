@@ -1,17 +1,19 @@
-import { ArrowLeft, Download, Info, Settings2, ShieldAlert } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowLeft, Info, ShieldAlert } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { FavoriteButton } from "@/components/shared/plugin-card";
+import { Section } from "@/components/shared/section";
 import { PluginStatusBadge } from "@/components/shared/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorState, Skeleton } from "@/components/ui/states";
-import { useToast } from "@/components/ui/toast";
+import { usePluginToggle } from "@/hooks/use-plugin-toggle";
 import { resolveIcon } from "@/lib/icons";
 import { ApiError } from "@/services/api";
-import { useDownloadYoutubeVideo, usePlugin, useSaveYoutubeDownloaderSettings, useSetPluginState, useTasks, useYoutubeDownloaderSettings } from "@/services/queries";
-import type { Plugin, YoutubeDownloaderSettings } from "@/types/api";
+import { usePlugin } from "@/services/queries";
+import type { Plugin } from "@/types/api";
+import { YoutubeDownloader } from "./youtube-downloader";
 
 const PERMISSION_LABELS: Record<string, string> = {
   "files.read": "Leer archivos que le entregues",
@@ -21,189 +23,15 @@ const PERMISSION_LABELS: Record<string, string> = {
   "config.read": "Leer su propia configuración",
 };
 
-function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return <section className="rounded-lg border bg-card p-4 shadow-card"><div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold">{title}</h2>{action}</div>{children}</section>;
-}
-
-const QUALITY_OPTIONS: { value: YoutubeDownloaderSettings["quality"]; label: string }[] = [
-  { value: "best", label: "Máxima disponible" },
-  { value: "2160", label: "2160p (4K)" },
-  { value: "1440", label: "1440p" },
-  { value: "1080", label: "1080p" },
-  { value: "720", label: "720p" },
-  { value: "480", label: "480p" },
-];
-const AUDIO_QUALITY_OPTIONS: { value: YoutubeDownloaderSettings["quality"]; label: string }[] = [
-  { value: "best", label: "Máxima disponible" },
-  { value: "320", label: "320 kbps" },
-  { value: "256", label: "256 kbps" },
-  { value: "192", label: "192 kbps" },
-  { value: "128", label: "128 kbps" },
-];
-
-function YoutubeSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const toast = useToast();
-  const query = useYoutubeDownloaderSettings();
-  const save = useSaveYoutubeDownloaderSettings();
-  const [draft, setDraft] = useState<YoutubeDownloaderSettings | null>(null);
-
-  useEffect(() => {
-    if (query.data) {
-      const audioOnly = query.data.output_format === "mp3" || query.data.output_format === "wav";
-      const validAudioQuality = ["best", "320", "256", "192", "128"].includes(query.data.quality);
-      setDraft({ ...query.data, quality: audioOnly && !validAudioQuality ? "best" : query.data.quality });
-    }
-  }, [query.data]);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
-  const update = <K extends keyof YoutubeDownloaderSettings>(key: K, value: YoutubeDownloaderSettings[K]) =>
-    setDraft((current) => current ? { ...current, [key]: value } : current);
-  const audioOnly = draft?.output_format === "mp3" || draft?.output_format === "wav";
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!draft) return;
-    save.mutate(draft, {
-      onSuccess: () => { toast.success("Preferencias de descarga guardadas."); onClose(); },
-      onError: (error) => toast.error(error),
-    });
-  };
-
-  return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      aria-labelledby="youtube-settings-title"
-      className="w-[calc(100%-2rem)] max-w-lg rounded-lg border border-gray-300 bg-white p-0 text-black shadow-pop backdrop:bg-black/60"
-    >
-      <form onSubmit={submit}>
-        <div className="space-y-4 p-5">
-          <h2 id="youtube-settings-title" className="text-base font-semibold text-black">Preferencias de descarga</h2>
-          {query.isPending || !draft ? <Skeleton className="h-40" /> : query.isError ? (
-            <p role="alert" className="text-sm text-destructive">No se pudieron cargar las preferencias.</p>
-          ) : (
-            <>
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-black">Formato</span>
-                <select value={draft.output_format} onChange={(event) => {
-                  const output_format = event.target.value as YoutubeDownloaderSettings["output_format"];
-                  setDraft((current) => current ? { ...current, output_format, quality: "best" } : current);
-                }}
-                  className="h-9 w-full rounded-md border border-gray-400 bg-white px-3 text-sm text-black">
-                  <option value="mp4">MP4</option><option value="webm">WEBM</option><option value="mov">MOV</option>
-                  <option value="mp3">MP3 (solo audio)</option><option value="wav">WAV (solo audio)</option>
-                </select>
-              </label>
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-black">{audioOnly ? "Calidad de audio" : "Resolución máxima"}</span>
-                <select value={draft.quality} onChange={(event) => update("quality", event.target.value as YoutubeDownloaderSettings["quality"])}
-                  className="h-9 w-full rounded-md border border-gray-400 bg-white px-3 text-sm text-black">
-                  {(audioOnly ? AUDIO_QUALITY_OPTIONS : QUALITY_OPTIONS).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
-            </>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 border-t border-gray-300 bg-white px-5 py-3">
-          <Button type="button" variant="outline" className="border-gray-400 bg-white text-black hover:bg-gray-100" onClick={onClose} disabled={save.isPending}>Cerrar</Button>
-          <Button type="submit" loading={save.isPending} disabled={!draft || query.isError}>Guardar</Button>
-        </div>
-      </form>
-    </dialog>
-  );
-}
-
-function YoutubeDownloader({ enabled }: { enabled: boolean }) {
-  const [url, setUrl] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const download = useDownloadYoutubeVideo();
-  const { data: downloaderSettings } = useYoutubeDownloaderSettings();
-  const { data: tasks } = useTasks(undefined, 50, download.isPending);
-  const activeTask = tasks?.items.find((task) =>
-    task.plugin_id === "youtube-dl" && task.operation === "download-video" && task.status === "running",
-  );
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    download.mutate(url, { onSuccess: () => setUrl("") });
-  };
-
-  return (
-    <>
-      <Section title="Descargar video" action={(
-        <Button variant="ghost" size="icon" aria-label="Preferencias de descarga" title="Preferencias de descarga" onClick={() => setSettingsOpen(true)}>
-          <Settings2 className="h-4 w-4" aria-hidden />
-        </Button>
-      )}>
-        <form onSubmit={submit} className="space-y-3">
-          <label htmlFor="youtube-url" className="block text-sm font-medium">URL de YouTube</label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="youtube-url"
-              name="url"
-              type="url"
-              required
-              maxLength={2048}
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <Button type="submit" loading={download.isPending} disabled={!enabled || !url.trim()}>
-              <Download className="h-4 w-4" aria-hidden />
-              Descargar
-            </Button>
-          </div>
-        </form>
-        {!enabled && <p className="mt-3 text-sm text-muted-foreground">Habilita el plugin para poder descargar.</p>}
-        {download.isPending && (
-          <div className="mt-3 space-y-1.5" aria-live="polite">
-            <div className="flex justify-between gap-3 text-xs text-success">
-              <span>{activeTask?.message ?? "Preparando descarga…"}</span>
-              {activeTask?.progress !== null && activeTask?.progress !== undefined && <span>{Math.round(activeTask.progress * 100)}%</span>}
-            </div>
-            <div
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round((activeTask?.progress ?? 0) * 100)}
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
-            >
-              <div className="h-full bg-success transition-all" style={{ width: `${Math.round((activeTask?.progress ?? 0) * 100)}%` }} />
-            </div>
-          </div>
-        )}
-        {download.isError && <p role="alert" className="mt-3 text-sm text-destructive">{download.error.message}</p>}
-        {download.isSuccess && <p role="status" className="mt-3 text-sm text-success">
-          {downloaderSettings?.output_format === "mp3" || downloaderSettings?.output_format === "wav"
-            ? "Audio descargado y guardado."
-            : "Video descargado y guardado."}
-        </p>}
-      </Section>
-      <YoutubeSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </>
-  );
-}
+const Row = ({ k, v }: { k: string; v: ReactNode }) => (
+  <div className="flex items-start justify-between gap-3"><dt className="text-muted-foreground">{k}</dt><dd className="text-right">{v}</dd></div>
+);
 
 function Body({ plugin }: { plugin: Plugin }) {
-  const toast = useToast();
-  const setState = useSetPluginState();
-  const [confirm, setConfirm] = useState(false);
+  const { apply, confirming, setConfirming, isPending } = usePluginToggle(plugin);
   const Icon = resolveIcon(plugin.icon);
   const usable = plugin.status === "available";
-
-  const apply = (enabled: boolean) =>
-    setState.mutate({ id: plugin.id, enabled }, {
-      onSuccess: () => { toast.success(enabled ? `${plugin.name} habilitado.` : `${plugin.name} deshabilitado.`); setConfirm(false); },
-      onError: (e) => { toast.error(e); setConfirm(false); },
-    });
+  const { platform } = plugin;
 
   return (
     <>
@@ -219,8 +47,8 @@ function Body({ plugin }: { plugin: Plugin }) {
         <div className="flex items-center gap-2">
           {usable && <FavoriteButton plugin={plugin} />}
           {usable && (plugin.enabled
-            ? <Button variant="outline" onClick={() => setConfirm(true)}>Deshabilitar</Button>
-            : <Button loading={setState.isPending} onClick={() => apply(true)}>Habilitar</Button>)}
+            ? <Button variant="outline" onClick={() => setConfirming(true)}>Deshabilitar</Button>
+            : <Button loading={isPending} onClick={() => apply(true)}>Habilitar</Button>)}
         </div>
       </div>
 
@@ -261,7 +89,7 @@ function Body({ plugin }: { plugin: Plugin }) {
               <Row k="Identificador" v={<code className="text-xs">{plugin.id}</code>} />
               <Row k="Integración" v={plugin.integration_type ?? "—"} />
               <Row k="Formato del plugin" v={plugin.contract_version ? `v${plugin.contract_version}` : "—"} />
-              <Row k="Versión requerida" v={plugin.platform ? `${plugin.platform.min_version}${plugin.platform.max_version ? ` · ≤ ${plugin.platform.max_version}` : ""}` : "—"} />
+              <Row k="Versión requerida" v={platform ? `${platform.min_version}${platform.max_version ? ` · ≤ ${platform.max_version}` : ""}` : "—"} />
               <Row k="Carpeta" v={<code className="text-xs">{plugin.folder}</code>} />
               <Row k="Categorías" v={plugin.categories.length ? <span className="flex flex-wrap justify-end gap-1">{plugin.categories.map((c) => <Badge key={c}>{c}</Badge>)}</span> : "—"} />
             </dl>
@@ -272,16 +100,12 @@ function Body({ plugin }: { plugin: Plugin }) {
         </div>
       </div>
 
-      <ConfirmDialog open={confirm} title={`¿Deshabilitar ${plugin.name}?`} confirmLabel="Deshabilitar" destructive loading={setState.isPending}
+      <ConfirmDialog open={confirming} title={`¿Deshabilitar ${plugin.name}?`} confirmLabel="Deshabilitar" destructive loading={isPending}
         description="La herramienta dejará de estar disponible para su uso. Podés volver a habilitarla cuando quieras."
-        onConfirm={() => apply(false)} onClose={() => setConfirm(false)} />
+        onConfirm={() => apply(false)} onClose={() => setConfirming(false)} />
     </>
   );
 }
-
-const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
-  <div className="flex items-start justify-between gap-3"><dt className="text-muted-foreground">{k}</dt><dd className="text-right">{v}</dd></div>
-);
 
 export function PluginDetailsPage() {
   const { pluginId = "" } = useParams();

@@ -1,5 +1,4 @@
-import { CheckCircle2, Monitor, Moon, RefreshCw, Sun, XCircle } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, FolderOpen, Monitor, Moon, RefreshCw, Sun, XCircle } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PluginStatusBadge } from "@/components/shared/status-badges";
 import { Button } from "@/components/ui/button";
@@ -7,11 +6,11 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState, ErrorState, PageHeader, Skeleton } from "@/components/ui/states";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
+import { usePluginToggle } from "@/hooks/use-plugin-toggle";
 import { resolveIcon } from "@/lib/icons";
 import { cn } from "@/lib/utils";
-import { useAppInfo, useDiagnostics, usePlugins, useRefreshPlugins, useSaveTheme, useSetPluginState, useSettings } from "@/services/queries";
+import { useAppInfo, useDiagnostics, usePlugins, useRefreshPlugins, useSaveTheme, useSettings } from "@/services/queries";
 import type { Plugin, Theme } from "@/types/api";
-import { FolderOpen } from "lucide-react";
 
 const TABS = [
   { id: "appearance", label: "Apariencia" },
@@ -19,21 +18,24 @@ const TABS = [
   { id: "system", label: "Sistema" },
 ] as const;
 
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Claro", icon: Sun },
+  { value: "dark", label: "Oscuro", icon: Moon },
+  { value: "system", label: "Sistema", icon: Monitor },
+];
+
 function Appearance() {
   const { data, isPending, isError, error, refetch } = useSettings();
   const save = useSaveTheme();
   const toast = useToast();
   if (isPending) return <Skeleton className="h-24" />;
   if (isError) return <ErrorState error={error} onRetry={() => refetch()} />;
-  const options: { value: Theme; label: string; icon: typeof Sun }[] = [
-    { value: "light", label: "Claro", icon: Sun }, { value: "dark", label: "Oscuro", icon: Moon }, { value: "system", label: "Sistema", icon: Monitor },
-  ];
   return (
     <section aria-labelledby="theme-h">
       <h2 id="theme-h" className="mb-1 text-sm font-semibold">Tema</h2>
       <p className="mb-3 text-sm text-muted-foreground">Elegí cómo se ve Hub.</p>
       <div role="radiogroup" aria-labelledby="theme-h" className="grid max-w-md grid-cols-3 gap-2">
-        {options.map(({ value, label, icon: Icon }) => (
+        {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
           <button key={value} type="button" role="radio" aria-checked={data.theme === value} disabled={save.isPending}
             onClick={() => save.mutate(value, { onError: toast.error })}
             className={cn("flex flex-col items-center gap-2 rounded-lg border bg-card p-4 text-sm font-medium hover:bg-muted", data.theme === value && "border-primary ring-1 ring-primary")}>
@@ -47,20 +49,15 @@ function Appearance() {
 
 function PluginRow({ plugin }: { plugin: Plugin }) {
   const Icon = resolveIcon(plugin.icon);
-  const setState = useSetPluginState();
-  const toast = useToast();
-  const [confirm, setConfirm] = useState(false);
-  const apply = (enabled: boolean) => setState.mutate({ id: plugin.id, enabled }, {
-    onSuccess: () => { toast.success(enabled ? `${plugin.name} habilitado.` : `${plugin.name} deshabilitado.`); setConfirm(false); },
-    onError: (e) => { toast.error(e); setConfirm(false); },
-  });
+  const { apply, confirming, setConfirming, isPending } = usePluginToggle(plugin);
   const valid = plugin.status === "available";
+  const linkable = valid || plugin.status === "incompatible";
   return (
     <li className="flex flex-wrap items-start gap-3 p-4">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted"><Icon className="h-4 w-4" aria-hidden /></div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          {valid || plugin.status === "incompatible"
+          {linkable
             ? <Link to={`/tools/${encodeURIComponent(plugin.id)}`} className="text-sm font-medium hover:underline">{plugin.name}</Link>
             : <span className="text-sm font-medium">{plugin.name}</span>}
           <PluginStatusBadge plugin={plugin} />
@@ -68,10 +65,10 @@ function PluginRow({ plugin }: { plugin: Plugin }) {
         <p className="text-xs text-muted-foreground">{plugin.version ? `v${plugin.version} · ` : ""}carpeta: {plugin.folder}</p>
         {plugin.problems.length > 0 && <ul className="mt-1 list-inside list-disc text-xs text-destructive">{plugin.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
       </div>
-      <Switch checked={plugin.enabled} disabled={!valid} busy={setState.isPending} label={`Habilitar ${plugin.name}`}
-        onChange={(v) => (v ? apply(true) : setConfirm(true))} />
-      <ConfirmDialog open={confirm} title={`¿Deshabilitar ${plugin.name}?`} confirmLabel="Deshabilitar" destructive loading={setState.isPending}
-        description="La herramienta dejará de estar disponible para su uso." onConfirm={() => apply(false)} onClose={() => setConfirm(false)} />
+      <Switch checked={plugin.enabled} disabled={!valid} busy={isPending} label={`Habilitar ${plugin.name}`}
+        onChange={(next) => (next ? apply(true) : setConfirming(true))} />
+      <ConfirmDialog open={confirming} title={`¿Deshabilitar ${plugin.name}?`} confirmLabel="Deshabilitar" destructive loading={isPending}
+        description="La herramienta dejará de estar disponible para su uso." onConfirm={() => apply(false)} onClose={() => setConfirming(false)} />
     </li>
   );
 }
@@ -98,7 +95,12 @@ function Plugins() {
 }
 
 function StatusLine({ ok, label }: { ok: boolean; label: string }) {
-  return <li className="flex items-center gap-2 text-sm">{ok ? <CheckCircle2 className="h-4 w-4 text-success" aria-label="Correcto" /> : <XCircle className="h-4 w-4 text-destructive" aria-label="Con problemas" />}{label}</li>;
+  return (
+    <li className="flex items-center gap-2 text-sm">
+      {ok ? <CheckCircle2 className="h-4 w-4 text-success" aria-label="Correcto" /> : <XCircle className="h-4 w-4 text-destructive" aria-label="Con problemas" />}
+      {label}
+    </li>
+  );
 }
 
 function System() {
@@ -108,13 +110,17 @@ function System() {
   if (info.isError) return <ErrorState error={info.error} onRetry={() => info.refetch()} />;
   if (diag.isError) return <ErrorState error={diag.error} onRetry={() => diag.refetch()} />;
   const i = info.data, d = diag.data;
+  const platformRows: [string, string][] = [
+    ["Versión", i.version], ["API", i.api_version], ["Entorno", i.environment],
+    ["Modo", i.mode === "single_user_local" ? "Usuario único local" : i.mode],
+    ["Plugins no confiables", i.untrusted_plugins_allowed ? "Permitidos" : "Deshabilitados"],
+  ];
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <section className="rounded-lg border bg-card p-4 shadow-card">
         <h2 className="mb-3 text-sm font-semibold">Plataforma</h2>
         <dl className="space-y-1.5 text-sm">
-          {[["Versión", i.version], ["API", i.api_version], ["Entorno", i.environment], ["Modo", i.mode === "single_user_local" ? "Usuario único local" : i.mode],
-            ["Plugins no confiables", i.untrusted_plugins_allowed ? "Permitidos" : "Deshabilitados"]].map(([k, v]) => (
+          {platformRows.map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3"><dt className="text-muted-foreground">{k}</dt><dd>{v}</dd></div>
           ))}
         </dl>

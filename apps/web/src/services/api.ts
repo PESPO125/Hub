@@ -12,6 +12,9 @@ export class ApiError extends Error {
 
 const BASE = "/api/v1";
 
+const networkError = () =>
+  new ApiError(0, "network_error", "No se pudo conectar con el servidor de Hub. ¿Está en ejecución el backend?");
+
 async function responseError(res: Response): Promise<ApiError> {
   let code = "http_error", message = `Error ${res.status}`, rid: string | null = null;
   try {
@@ -21,34 +24,33 @@ async function responseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, rid);
 }
 
-export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
-  const { json, headers, ...rest } = init;
+async function request(path: string, init: RequestInit): Promise<Response> {
   let res: Response;
   try {
-    res = await fetch(BASE + path, {
-      ...rest,
-      headers: { Accept: "application/json", ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...headers },
-      body: json !== undefined ? JSON.stringify(json) : rest.body,
-    });
+    res = await fetch(BASE + path, init);
   } catch {
-    throw new ApiError(0, "network_error", "No se pudo conectar con el servidor de Hub. ¿Está en ejecución el backend?");
+    throw networkError();
   }
   if (!res.ok) throw await responseError(res);
+  return res;
+}
+
+export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  const { json, headers, ...rest } = init;
+  const res = await request(path, {
+    ...rest,
+    headers: { Accept: "application/json", ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...headers },
+    body: json !== undefined ? JSON.stringify(json) : rest.body,
+  });
   return (await res.json()) as T;
 }
 
 export async function downloadYoutubeVideo(url: string): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(`${BASE}/plugins/youtube-dl/download`, {
-      method: "POST",
-      headers: { Accept: "application/octet-stream", "Content-Type": "application/json" },
-      body: JSON.stringify({ url, save_to_output_directory: false }),
-    });
-  } catch {
-    throw new ApiError(0, "network_error", "No se pudo conectar con el servidor de Hub. ¿Está en ejecución el backend?");
-  }
-  if (!res.ok) throw await responseError(res);
+  const res = await request("/plugins/youtube-dl/download", {
+    method: "POST",
+    headers: { Accept: "application/octet-stream", "Content-Type": "application/json" },
+    body: JSON.stringify({ url, save_to_output_directory: false }),
+  });
 
   const filename = res.headers.get("content-disposition")?.match(/filename="?([^";]+)"?/i)?.[1] ?? "video-youtube";
   const objectUrl = URL.createObjectURL(await res.blob());
