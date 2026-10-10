@@ -17,8 +17,10 @@ def plugins_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def client(tmp_path: Path, plugins_dir: Path):
-    s = Settings(database_url=f"sqlite:///{tmp_path/'t.sqlite3'}", plugins_dir=plugins_dir,
-                 data_dir=tmp_path / "data", allow_untrusted_plugins=False)
+    s = Settings(
+        database_url=f"sqlite:///{tmp_path/'t.sqlite3'}", plugins_dir=plugins_dir, data_dir=tmp_path / "data",
+        allowed_hosts="testserver,127.0.0.1,localhost", output_roots=str(tmp_path),
+    )
     with TestClient(create_app(s)) as c:
         yield c
 

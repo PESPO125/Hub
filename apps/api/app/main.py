@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy import inspect, text
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import API_VERSION, PLATFORM_VERSION, Settings, get_settings

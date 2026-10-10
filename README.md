@@ -1,34 +1,6 @@
-<div align="center">
-
 # Hub
-[![HUB](https://raw.githubusercontent.com/PESPO125/Hub/refs/heads/main/.github/banner.svg)](#readme)
 
-</div>
-
-
-<div align="center">
-
-<!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
-<a href="#readme">
-  <img src="https://github.com/PESPO125/Hub/raw/readme/.github/banner.png" alt="Banner del proyecto">
-</a>
-
-<!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
-[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
-
-<!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
-[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version")
-
-<!-- Insignia de Licencia -->
-[![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
-
-<!-- Insignia de actividad de commits -->
-[![Commits](https://img.shields.io/github/commit-activity/m/PESPO125/Hub?label=commits&style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
-
-</div>
-
-
-Plataforma de herramientas independientes (microapps) con sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
+Plataforma de herramientas independientes (microapps) con sistema de plugins. Esta versión contiene **solo el núcleo**: interfaz, API, registro de plugins, tareas, archivos y configuración.
 
 ## Estado
 - Etapa 1 (arquitectura): `docs/architecture.md`.
@@ -63,8 +35,12 @@ python scripts/dev.py
 Inicia la API en `http://127.0.0.1:8000` y la web en `http://127.0.0.1:5173`. Si ya hay una API Hub activa, la reutiliza. `Ctrl+C` detiene los procesos que inició el script.
 Si esos puertos están ocupados, puedes cambiarlos con `HUB_API_PORT` y `HUB_WEB_PORT`.
 
-## Configuración
-Edita [`hub.toml`](hub.toml) en la raíz del proyecto para cambiar la versión que muestra Hub y los valores predeterminados del backend (`env`, `database_url`, `plugins_dir`, `data_dir`, `allow_untrusted_plugins`, `cors_origins` y `task_workers`). Las variables de entorno `HUB_*` prevalecen sobre el archivo. Si cambias `version`, regenera también OpenAPI con `python scripts/export_contracts.py`.
+## Configuración (variables de entorno, prefijo `HUB_`)
+| Variable | Por defecto | Descripción |
+|---|---|---|
+| `HUB_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Hosts aceptados por la API (protección contra DNS rebinding). |
+| `HUB_OUTPUT_ROOTS` | *(vacío)* | Carpetas extra permitidas para descargas, separadas por `;` en Windows o `:` en Linux/macOS. Por defecto solo se permiten rutas dentro de tu carpeta de usuario y de `data/`. |
+| `HUB_CORS_ORIGINS` | `http://localhost:5173` | Orígenes permitidos por CORS. |
 
 ## Tests
 ```bash
@@ -73,5 +49,8 @@ cd apps/web && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
 ## Estructura
-`apps/web` (React + Vite + Tailwind) · `apps/api` (FastAPI + SQLAlchemy) · `packages/contracts` (JSON Schema/OpenAPI generados) · `plugins/youtube-dl` (plugin core de ejemplo) · `docs/`.
+`apps/web` (React + Vite + Tailwind) · `apps/api` (FastAPI + SQLAlchemy) · `packages/contracts` (JSON Schema/OpenAPI generados) · `plugins/` (vacía) · `docs/`.
 Regenerar contratos: `python scripts/export_contracts.py`.
+
+## Licencia
+[MIT](LICENSE)
