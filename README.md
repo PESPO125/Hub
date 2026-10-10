@@ -14,10 +14,10 @@
 </a>
 
 <!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
-[![Release version](https://img.shields.io/github/v/release/TU-USUARIO/TU-REPOSITORIO?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
+[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
 
 <!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
-[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/TU-USUARIO/TU-REPOSITORIO/blob/master/pyproject.toml "Python Version")
+[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version")
 
 <!-- Insignia de Licencia -->
 [![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
