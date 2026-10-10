@@ -1,20 +1,33 @@
 # Hub
+=======
 
-Plataforma de herramientas independientes (microapps) con sistema de plugins. Esta versión contiene **solo el núcleo**: interfaz, API, registro de plugins, tareas, archivos y configuración.
+<!-- Reemplaza esta URL con el enlace raw de tu propio banner/imagen -->
+<a href="#readme">
+  <img src="https://github.com/PESPO125/Hub/raw/readme/.github/banner.png" alt="Banner del proyecto">
+</a>
+
+<!-- Insignia de última versión (ajusta tu usuario y repositorio) -->
+[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation")
+
+<!-- Insignia de versión de Python (lee el archivo pyproject.toml de tu repo) -->
+[![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FTU-USUARIO%2FTU-REPOSITORIO%2Frefs%2Fheads%2Fmaster%2Fpyproject.toml&style=for-the-badge)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version")
+
+<!-- Insignia de Licencia -->
+[![License: Unlicense](https://img.shields.io/badge/-Unlicense-red.svg?style=for-the-badge)](LICENSE "License")
+
+<!-- Insignia de actividad de commits -->
+[![Commits](https://github.com/PESPO125/Hub/activity?label=commits&style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+
+</div>
+
+
+Plataforma de herramientas independientes (microapps) con sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
+>>>>>>> parent of 9a4f47f (Edited: README.md)
 
 ## Estado
 - Etapa 1 (arquitectura): `docs/architecture.md`.
 - Interfaz gráfica inicial + API de lectura/administración + registro de plugins: implementados y probados.
 - Pendiente: ver `docs/status.md`.
-
-## Aviso legal y de uso
-
-Hub es un proyecto personal, pensado para **uso local y personal**. Se ofrece "tal cual", sin garantías de ningún tipo.
-
-- El plugin de YouTube usa [yt-dlp](https://github.com/yt-dlp/yt-dlp). Descargar contenido de YouTube puede incumplir sus Términos del Servicio o las leyes de derechos de autor de tu país. **Eres el único responsable del uso que le des**: descarga solo contenido propio, de dominio público o para el que tengas permiso.
-- Los autores no se hacen responsables del mal uso de esta herramienta ni de los daños que pueda causar.
-- La API no tiene autenticación y escucha solo en `127.0.0.1`. **No la expongas a internet ni a tu red local.**
-- Los plugins de terceros se ejecutan con los permisos de tu usuario. Instala solo plugins en los que confíes.
 
 ## Requisitos
 Python ≥ 3.11 y Node ≥ 20.
