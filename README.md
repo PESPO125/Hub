@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Banner del proyecto](https://github.com/PESPO125/Hub/raw/master/.github/banner.png)](https://github.com/PESPO125/Hub)
+[![Banner del proyecto](https://github.com/PESPO125/Hub/blob/master/.github/banner.png)](https://github.com/PESPO125/Hub)
 
 [![Hub version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FPESPO125%2FHub%2Fmain%2Fpackages%2Fcontracts%2Fapi%2Fopenapi.json&query=%24.info.version&label=Hub&color=brightgreen&style=for-the-badge)](hub.toml "Hub version") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/raw/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-unlicense-red.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
