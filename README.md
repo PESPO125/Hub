@@ -46,6 +46,9 @@ Si esos puertos están ocupados, puedes cambiarlos con `HUB_API_PORT` y `HUB_WEB
 
 ```bash
 cd apps/api && pytest && ruff check .
+```
+
+```bash
 cd apps/web && npm run typecheck && npm run lint && npm test && npm run build
 ```
 
