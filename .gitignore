@@ -12,3 +12,5 @@ dist/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.markdownlint-cli2.jsonc
+RELEASE.md
