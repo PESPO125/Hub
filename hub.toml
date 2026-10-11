@@ -1,7 +1,7 @@
 # Configuración central de Hub.
-# Las variables de entorno HUB_* tienen prioridad sobre estos valores.
+# Las variables HUB_* pueden reemplazar los valores operativos; la versión se define aquí.
 
-version = "1.4"
+version = "0.4.0"
 
 # API y almacenamiento
 env = "development"

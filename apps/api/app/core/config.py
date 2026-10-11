@@ -1,5 +1,4 @@
 from functools import lru_cache
-import os
 from pathlib import Path
 import tomllib
 
@@ -13,7 +12,7 @@ HUB_CONFIG_FILE = REPO_ROOT / "hub.toml"
 with HUB_CONFIG_FILE.open("rb") as config_file:
     _HUB_CONFIG = tomllib.load(config_file)
 
-PLATFORM_VERSION = os.environ.get("HUB_VERSION", str(_HUB_CONFIG.get("version", "1.3")))
+PLATFORM_VERSION = str(_HUB_CONFIG["version"])
 API_VERSION = "v1"
 
 
