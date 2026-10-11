@@ -2,21 +2,17 @@
 
 [![Banner del proyecto](https://github.com/PESPO125/Hub/raw/readme/.github/banner.png)](#readme)
 
-[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-license-green.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](#installation "Installation") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/blob/main/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-unlicense-red.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
 
 </div>
 
 
-Plataforma de herramientas independientes (microapps) con sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
->>>>>>> parent of 9a4f47f (Edited: README.md)
+Plataforma de herramientas independientes conectadas mediante un sistema de plugins. Incluye el núcleo, un plugin core de YouTube y la infraestructura común de tareas y archivos.
 
 ## Estado
 - Etapa 1 (arquitectura): `docs/architecture.md`.
 - Interfaz gráfica inicial + API de lectura/administración + registro de plugins: implementados y probados.
 - Pendiente: ver `docs/status.md`.
-
-## Requisitos
-Python ≥ 3.11 y Node ≥ 20.
 
 ## Instalación
 ```bash
@@ -50,6 +46,3 @@ cd apps/web && npm run typecheck && npm run lint && npm test && npm run build
 ## Estructura
 `apps/web` (React + Vite + Tailwind) · `apps/api` (FastAPI + SQLAlchemy) · `packages/contracts` (JSON Schema/OpenAPI generados) · `plugins/` (vacía) · `docs/`.
 Regenerar contratos: `python scripts/export_contracts.py`.
-
-## Licencia
-[MIT](LICENSE)
