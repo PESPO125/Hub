@@ -1,8 +1,8 @@
 <div align="center">
 
-[![Banner del proyecto](https://github.com/PESPO125/Hub/blob/master/.github/banner.png)](https://github.com/PESPO125/Hub)
+[![Banner del proyecto](https://github.com/rosaura01/Hub/blob/master/.github/banner.png)](https://github.com/rosaura01/Hub)
 
-[![Release version](https://img.shields.io/github/v/release/PESPO125/Hub?color=brightgreen&label=Latest&style=for-the-badge)](https://github.com/PESPO125/Hub/releases/latest "Latest release") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/PESPO125/Hub/raw/master/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/PESPO125/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-unlicense-red.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/PESPO125/Hub/commits "Commit History")
+[![Release version](https://img.shields.io/github/v/release/rosaura01/Hub?color=brightgreen&label=Latest&style=for-the-badge)](https://github.com/rosaura01/Hub/releases/latest "Latest release") [![Python Version](https://img.shields.io/badge/PYTHON-%E2%89%A5_1.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://github.com/rosaura01/Hub/raw/master/apps/api/pyproject.toml "Python Version") [![Node.js Version](https://img.shields.io/badge/NODE-%E2%89%A5_20-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://github.com/rosaura01/Hub "Node.js Version") [![License: Unlicense](https://img.shields.io/badge/-unlicense-red.svg?style=for-the-badge)](LICENSE "License") [![Commits](https://img.shields.io/badge/COMMITS-Activo-brightgreen?style=for-the-badge)](https://github.com/rosaura01/Hub/commits "Commit History")
 
 </div>
 

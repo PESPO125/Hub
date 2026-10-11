@@ -20,7 +20,7 @@
 
 * \[x\] Hacer README.md
 
-* \[ \] Vectorizar [Banner](https://github.com/PESPO125/Hub/raw/readme/.github/banner.png)
+* \[ \] Vectorizar [Banner](https://github.com/rosaura01/Hub/raw/readme/.github/banner.png)
 
 ## 🛠️ Fix
 
