@@ -7,7 +7,8 @@ on:
     branches: [ master ]
 
 jobs:
-  build-and-test:
+  backend-ci:
+    name: Backend Checks (API)
     runs-on: ubuntu-latest
 
     steps:
@@ -19,28 +20,39 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dependencias de Python y Ruff/Pytest
+      - name: Instalar dependencias del Backend
         run: |
           python -m pip install --upgrade pip
-          pip install pytest ruff
-          # Si tienes un requirements.txt, descomenta la siguiente línea:
-          # pip install -r requirements.txt
+          pip install -e "apps/api[dev]"
 
-      - name: Ejecutar linter Ruff
-        run: ruff check .
+      - name: Ejecutar Tests y Linter (Pytest & Ruff)
+        run: |
+          cd apps/api
+          pytest
+          ruff check .
 
-      - name: Ejecutar tests con Pytest
-        run: pytest
+  frontend-ci:
+    name: Frontend Checks (Web)
+    runs-on: ubuntu-latest
 
-      - name: Configurar Node.js (Frontend)
+    steps:
+      - name: Copiar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Instalar dependencias y verificar frontend
+      - name: Instalar dependencias del Frontend
         run: |
-          # Cambia 'frontend' por la ruta de tu carpeta de frontend si es distinta
-          cd frontend
+          cd apps/web
           npm ci
+
+      - name: Ejecutar comprobaciones del Frontend
+        run: |
+          cd apps/web
+          npm run typecheck
+          npm run lint
+          npm test
           npm run build
-          # npm test -- --watchAll=false # Descomenta si tienes tests de frontend
