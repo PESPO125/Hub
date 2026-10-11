@@ -95,7 +95,8 @@ def test_create_task_runs_subprocess_and_stores_outputs(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(executor, "_plugin_python", lambda *_args: sys.executable)
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'hub.sqlite3'}", plugins_dir=plugins,
-                        data_dir=tmp_path / "data", allow_untrusted_plugins=True)
+                        data_dir=tmp_path / "data", allow_untrusted_plugins=True,
+                        allowed_hosts="testserver,127.0.0.1,localhost")
     with TestClient(create_app(settings)) as client:
         client.post("/api/v1/plugins/refresh")
         client.patch("/api/v1/plugins/sample-plugin/state", json={"enabled": True})
@@ -125,7 +126,7 @@ def test_create_task_runs_subprocess_and_stores_outputs(tmp_path, monkeypatch):
 def test_builtin_youtube_subprocess_runs_when_external_plugins_are_disabled(tmp_path):
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'hub.sqlite3'}",
                         plugins_dir=REPO_ROOT / "plugins", data_dir=tmp_path / "data",
-                        allow_untrusted_plugins=False)
+                        allow_untrusted_plugins=False, allowed_hosts="testserver,127.0.0.1,localhost")
     with TestClient(create_app(settings)) as client:
         client.patch("/api/v1/plugins/youtube-dl/state", json={"enabled": True})
         response = client.post("/api/v1/tasks", json={
@@ -159,7 +160,8 @@ def test_task_cancellation_terminates_plugin_process(tmp_path, monkeypatch):
     (folder / "main.py").write_text("import sys, time\nsys.stdin.readline()\ntime.sleep(30)\n")
     monkeypatch.setattr(executor, "_plugin_python", lambda *_args: sys.executable)
     settings = Settings(database_url=f"sqlite:///{tmp_path / 'hub.sqlite3'}", plugins_dir=plugins,
-                        data_dir=tmp_path / "data", allow_untrusted_plugins=True)
+                        data_dir=tmp_path / "data", allow_untrusted_plugins=True,
+                        allowed_hosts="testserver,127.0.0.1,localhost")
     with TestClient(create_app(settings)) as client:
         client.post("/api/v1/plugins/refresh")
         client.patch("/api/v1/plugins/sleep-plugin/state", json={"enabled": True})

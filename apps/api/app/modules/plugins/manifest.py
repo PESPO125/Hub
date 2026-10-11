@@ -41,7 +41,7 @@ class Integration(BaseModel):
 
 class PlatformCompat(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    min_version: str = Field(default="1.0", pattern=r"^\d+\.\d+$")
+    min_version: str = Field(default="0.1", pattern=r"^\d+\.\d+$")
     max_version: str | None = Field(default=None, pattern=r"^\d+\.\d+$")
 
 

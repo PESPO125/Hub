@@ -55,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Hub API", version=PLATFORM_VERSION, lifespan=lifespan,
                   openapi_url=f"/api/{API_VERSION}/openapi.json", docs_url=f"/api/{API_VERSION}/docs")
     app.state.settings = settings
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_host_list)
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list,
                        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["*"])
 

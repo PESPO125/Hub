@@ -15,7 +15,8 @@ MAX_MANIFEST_BYTES = 64 * 1024
 
 
 def _ver(v: str) -> tuple[int, ...]:
-    return tuple(int(p) for p in v.split("."))
+    # Compare versions consistently even when one value omits trailing components.
+    return tuple(int(p) for p in v.split(".")) + (0,) * (3 - len(v.split(".")))
 
 
 @dataclass

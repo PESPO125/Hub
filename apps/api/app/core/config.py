@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     allow_untrusted_plugins: bool = False
     cors_origins: str = "http://localhost:5173"
+    allowed_hosts: str = "127.0.0.1,localhost"
     task_workers: int = Field(default=4, ge=1, le=32)
 
     @field_validator("plugins_dir", "data_dir")
@@ -48,6 +49,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
 
 
 @lru_cache

@@ -144,7 +144,7 @@ export function YoutubeDownloader({ enabled }: { enabled: boolean }) {
               onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
               className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             <Button type="submit" loading={download.isPending} disabled={!enabled || !url.trim()}>
-              <Download className="h-4 w-4" aria-hidden />load
+              <Download className="h-4 w-4" aria-hidden />Descargar
             </Button>
           </div>
         </form>
@@ -161,7 +161,7 @@ export function YoutubeDownloader({ enabled }: { enabled: boolean }) {
             <p>{isAudioFormat(settings?.output_format) ? "Audio listo para guardar en tu equipo:" : "Video listo para guardar en tu equipo:"}</p>
             <div className="flex flex-wrap gap-2">
               {(submittedTask.files ?? []).map((file) => (
-                <DownloadFileLink key={file.id} fileId={file.id} fileName={file.display_name} className="px-3" label="download" />
+                <DownloadFileLink key={file.id} fileId={file.id} fileName={file.display_name} className="px-3" />
               ))}
             </div>
           </div>

@@ -10,4 +10,5 @@ plugins_dir = "plugins"
 data_dir = "data"
 allow_untrusted_plugins = false
 cors_origins = "http://localhost:5173"
+allowed_hosts = "127.0.0.1,localhost"
 task_workers = 4

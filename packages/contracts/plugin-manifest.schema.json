@@ -37,7 +37,7 @@
       "additionalProperties": false,
       "properties": {
         "min_version": {
-          "default": "1.0",
+          "default": "0.1",
           "pattern": "^\\d+\\.\\d+$",
           "title": "Min Version",
           "type": "string"
