@@ -13,7 +13,7 @@ dependencies = [
   "imageio-ffmpeg>=0.6.0",
 ]
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "httpx==0.28.1", "ruff==0.8.4"]
+dev = ["pytest==9.0.3", "httpx==0.28.1", "ruff==0.8.4"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 [tool.ruff]
