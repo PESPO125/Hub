@@ -18,6 +18,10 @@
 
 * \[x\] Agregar archivo de configuración
 
+* \[x\] Hacer README.md
+
+* \[ \] Vectorizar [Banner](https://github.com/PESPO125/Hub/raw/readme/.github/banner.png)
+
 ## 🛠️ Fix
 
 * \[x\] Descargar videos en .mov, .mp3 y .wav
