@@ -23,9 +23,9 @@ jobs:
       - name: Instalar dependencias del Backend
         run: |
           python -m pip install --upgrade pip
-          pip install -e 'apps/api[dev]'
+          pip install -e "apps/api[dev]"
 
-      - name: Ejecutar Tests y Linter
+      - name: Ejecutar Tests y Linter (Pytest & Ruff)
         run: |
           cd apps/api
           pytest
